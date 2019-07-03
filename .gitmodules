@@ -1,0 +1,3 @@
+[submodule "dep/concur-replica"]
+	path = dep/concur-replica
+	url = https://github.com/pkamenarsky/concur-replica.git
