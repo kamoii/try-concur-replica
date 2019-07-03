@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import P
 
 main :: IO ()
-main = someFunc
+main = putText "yeah"

@@ -19,12 +19,59 @@ extra-source-files:
 # common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/githubuser/try-concur-replica#readme>
 
+default-extensions:
+  AutoDeriveTypeable
+  BangPatterns
+  BinaryLiterals
+  ConstraintKinds
+  DataKinds
+  DefaultSignatures
+  DeriveDataTypeable
+  DeriveFoldable
+  DeriveFunctor
+  DeriveGeneric
+  DeriveTraversable
+  EmptyDataDecls
+  ExistentialQuantification
+  FlexibleContexts
+  FlexibleInstances
+  FunctionalDependencies
+  GADTs
+  GeneralizedNewtypeDeriving
+  InstanceSigs
+  KindSignatures
+  LambdaCase
+  MonadFailDesugaring
+  MultiParamTypeClasses
+  MultiWayIf
+  NamedFieldPuns
+  NoImplicitPrelude
+  OverloadedStrings
+  PartialTypeSignatures
+  PatternGuards
+  PolyKinds
+  RankNTypes
+  RecordWildCards
+  ScopedTypeVariables
+  StandaloneDeriving
+  TupleSections
+  TypeFamilies
+  TypeSynonymInstances
+  ViewPatterns
+  # DoAndIfThenElse
+
 dependencies:
 - base >= 4.7 && < 5
 - relude
 - text
 - bytestring
+- concur-core
 - concur-replica
+- replica
+- wai
+- wai-websockets
+- websockets
+- warp
 
 library:
   source-dirs: src
