@@ -3,7 +3,14 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: concur-core-0.1.0.0@sha256:1d2611fbe797ddc7b6c3c6337c3b6348203646a115cc74efce5647ab687ff603,1371
+    pantry-tree:
+      size: 588
+      sha256: 451aa4beee408e4fb61c96a07b3af8912d9b45c0a63c515127ee017e16094ccd
+  original:
+    hackage: concur-core-0.1.0.0@sha256:1d2611fbe797ddc7b6c3c6337c3b6348203646a115cc74efce5647ab687ff603,1371
 snapshots:
 - completed:
     size: 500539

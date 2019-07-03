@@ -31,6 +31,7 @@ resolver: lts-13.27
 packages:
 - .
 - dep/concur-replica
+- dep/replica
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as
 # forks / in-progress versions pinned to a git hash. For example:
@@ -40,7 +41,8 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
-# extra-deps: []
+extra-deps:
+- concur-core-0.1.0.0@sha256:1d2611fbe797ddc7b6c3c6337c3b6348203646a115cc74efce5647ab687ff603,1371
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
