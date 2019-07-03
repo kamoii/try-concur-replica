@@ -5,12 +5,21 @@
 
 packages:
 - completed:
-    hackage: concur-core-0.1.0.0@sha256:1d2611fbe797ddc7b6c3c6337c3b6348203646a115cc74efce5647ab687ff603,1371
+    subdir: concur-core
+    cabal-file:
+      size: 1239
+      sha256: 6faa067cee99685b9121f3bf790775af40950d0612cca24a409764fcaec984c0
+    name: concur-core
+    version: 0.1.0.0
+    git: https://github.com/pkamenarsky/concur.git
     pantry-tree:
-      size: 588
-      sha256: 451aa4beee408e4fb61c96a07b3af8912d9b45c0a63c515127ee017e16094ccd
+      size: 728
+      sha256: e9659992361f602b836c6a72f5d62baf41755c264f1e419cbfcb1a5511dcb3df
+    commit: 6c6bcc07b2688182945b28f154a013eee3f624c5
   original:
-    hackage: concur-core-0.1.0.0@sha256:1d2611fbe797ddc7b6c3c6337c3b6348203646a115cc74efce5647ab687ff603,1371
+    subdir: concur-core
+    git: https://github.com/pkamenarsky/concur.git
+    commit: 6c6bcc07b2688182945b28f154a013eee3f624c5
 snapshots:
 - completed:
     size: 500539
