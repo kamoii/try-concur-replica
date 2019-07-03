@@ -86,6 +86,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - try-concur-replica
+    - random
 
 tests:
   try-concur-replica-test:

@@ -3,4 +3,4 @@ module P
   , module Relude
   ) where
 
-import Relude hiding (dev)
+import Relude hiding (div)
