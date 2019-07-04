@@ -11,11 +11,14 @@ import           Concur.Core
 import           Concur.Replica
 
 -- | Dumbest online game in the world.
+--
+-- It shows realtime participant number(who are connected to the server),
+-- and realtime total count number since the server booted.
 
 main :: IO ()
 main = do
   participantNum <- newTVarIO 0
-  counter        <- newTVarIO 1
+  counter        <- newTVarIO 0
   runDefault 8080 "Button Pusher" $ forever $ do
     liftIO $ atomically $ modifyTVar' participantNum (+1)
     div []
@@ -28,7 +31,6 @@ main = do
           liftIO $ atomically $ modifyTVar' counter (+1)
       ]
 
--- | Displays TVar's value.
 displayTVar :: Eq v => TVar v -> (v -> Widget HTML Void) -> Widget HTML a
 displayTVar tvar render = forever $ do
   v <- readTVarIO tvar
