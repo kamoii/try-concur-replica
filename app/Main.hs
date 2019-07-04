@@ -5,35 +5,34 @@ import P
 import qualified Data.Text              as T
 import           System.Random          as R
 import           Text.Read              (readMaybe)
+import           Control.Concurrent.STM (retry, check)
 --
 import           Concur.Core
 import           Concur.Replica
 
-inputEnter :: T.Text -> Widget HTML T.Text
-inputEnter v = do
-  e <- input [ autofocus True, value v, Left <$> onInput, Right <$> onKeyDown ]
-  case e of
-    Left e  -> inputEnter (targetValue $ target e)
-    Right e -> if kbdKey e == "Enter"
-      then pure v
-      else inputEnter v
+-- | Dumbest online game in the world.
 
--- Hi/Lo Game. Demonstrates simple architecture of a Concur app.
--- Also a good demonstration of how Concur makes IO effects safe at widget transitions (the random number generation).
 main :: IO ()
-main = runDefault 8080 "HiLo" $ forever $ do
-  h1 [] [text "I'm thinking of a number between 1 and 100"]
-  <|> (liftIO (R.randomRIO (1,100)) >>= go)
-  where
-    go :: Int -> Widget HTML ()
-    go n = do
-      guessStr <- div []
-        [ text "Try to guess: "
-        , inputEnter ""
-        ]
-      case readMaybe (T.unpack guessStr) of
-        Nothing -> go n
-        Just guess -> do
-          if | guess <  n -> div [] [text $ T.pack (show guess) <> " - Go High!"] <|> go n
-             | guess >  n -> div [] [text $ T.pack (show guess) <> " - Go Low!"] <|> go n
-             | otherwise  -> div [] [text $ "You guessed it! The answer was " <> T.pack (show n), button [const () <$> onClick] [text "Play again"]]
+main = do
+  participantNum <- newTVarIO 0
+  counter        <- newTVarIO 1
+  runDefault 8080 "Button Pusher" $ forever $ do
+    liftIO $ atomically $ modifyTVar' participantNum (+1)
+    div []
+      [ h1 [] [ text "Button Pusher!" ]
+      , p  [] [ text "Dumbest online game in the world. Just enjoy how the counter goes up." ]
+      , displayTVar participantNum $ \v -> h3 [] [ text $ "Current Paticipants: " <> show v ]
+      , displayTVar counter        $ \v -> h3 [] [ text $ "Counter: " <> show v ]
+      , forever $ do
+          button [ onClick ] [ text "Increment Counter" ]
+          liftIO $ atomically $ modifyTVar' counter (+1)
+      ]
+
+-- | Displays TVar's value.
+displayTVar :: Eq v => TVar v -> (v -> Widget HTML Void) -> Widget HTML a
+displayTVar tvar render = forever $ do
+  v <- readTVarIO tvar
+  orr
+    [ absurd <$> render v
+    , liftIO $ atomically $ readTVar tvar >>= check . (/=v)
+    ]
