@@ -78,9 +78,9 @@ library:
   source-dirs: src
 
 executables:
-  try-concur-replica-exe:
+  try-concur-replica-button-pusher:
     main:                Main.hs
-    source-dirs:         app
+    source-dirs:         app/ButtonPusher
     ghc-options:
     - -threaded
     - -rtsopts
@@ -88,6 +88,16 @@ executables:
     dependencies:
     - try-concur-replica
     - random
+
+  try-concur-replica-phantom-event:
+    main:                Main.hs
+    source-dirs:         app/PhantomEvent
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - try-concur-replica
 
 tests:
   try-concur-replica-test:
