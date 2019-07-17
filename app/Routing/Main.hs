@@ -119,6 +119,9 @@ instance (Monad m, Alternative m) => Alternative (RouteT r m) where
       Left e  -> throwError e
       Right v -> pure v
 
+instance MonadIO m => MonadIO (RouteT r m) where
+  liftIO = RouteT . lift . lift . liftIO
+
 -- TODO: Explicit Multie alternative instance for performance
 
 
