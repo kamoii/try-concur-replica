@@ -6,7 +6,7 @@ import P
 import qualified Data.Text              as T
 import           Text.Read              (readMaybe)
 import           Control.Concurrent.STM (retry, check)
-import           Control.Concurrent (threadDelay)
+import           Control.Concurrent     (threadDelay)
 import           Control.Exception
 import           Control.Monad.Except
 import           Control.Monad.Reader
@@ -100,7 +100,7 @@ instance Monad m => MonadRoute r (RouteT r m) where
   getRoute = RouteT $ lift ask
   toRoute  = RouteT . throwError
 
--- TODO: Is this implementation correct?
+-- TODO: Is this implementation correct? I'm not sure what `ShiftMap` is.
 instance ShiftMap m (RouteT r m) where
   shiftMap f (RouteT a) = RouteT $ mapExceptT (mapReaderT f) a
 
@@ -122,25 +122,28 @@ instance (Monad m, Alternative m) => Alternative (RouteT r m) where
 -- TODO: Explicit Multie alternative instance for performance
 
 
--- ???: `concur-replica`'s `text` is a concrete type `Widget HTML a`
-
--- ?? これ実装あってる？？
+-- `concur-replica`'s `text` has a concrete result type `Widget HTML a`.
+-- This code type checks, but I'm not sure if this implementation is correct.
 text' :: (Alternative m, ShiftMap (Widget HTML) m) => Text -> m a
 text' txt = shiftMap (const $ text txt) empty
 
--- Either 系 DerivingVia 作れば便利なのかな？
-
 data Route = Home | About
+
+-- We currently don't `preventDefault` on client-side, so needs a href="#"
+-- to preventing loading pages.
+link' :: (MonadRoute r m, _) => r -> Text -> m a
+link' r txt = toRouteM $ a [ r <$ onClick, href "#" ] [ text' txt ]
 
 home :: _ => m a
 home = do
   div []
     [ h1 [] [ text' "Home" ]
-    , p [] [ text' "Welocome! You can have a free counter!" ]
+    , p [] [ text' "Welcome! You can play with a counter!" ]
     , manualCounter 0
     , p []
       [ text' "If you want to know about us, visit "
-      , toRouteM $ a [ About <$ onClick, href "#" ] [ text' "about" ]
+      , link' About "about"
+      , text' "."
       ]
     ]
 
@@ -150,7 +153,7 @@ about = do
     [ h1 [] [ text' "About" ]
     , p []
       [ text' "Nothing to say. Just go "
-      , toRouteM $ a [ Home <$ onClick, href "#" ] [ text' "home" ]
+      , link' Home "home"
       , text' "."
       ]
     ]
@@ -170,7 +173,7 @@ autoCounter i = do
 
 main :: IO ()
 main = do
-  runDefault 8080 "test" $ orr
+  runDefault 8080 "mtl-style routing" $ orr
     [ autoCounter 0
     , manualCounter 0
     , loopRouteT Home $ \case
