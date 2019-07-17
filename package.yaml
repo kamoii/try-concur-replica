@@ -109,6 +109,17 @@ executables:
     dependencies:
     - try-concur-replica
 
+  try-concur-replica-routing:
+    main:                Main.hs
+    source-dirs:         app/Routing
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - try-concur-replica
+    - mtl
+
 tests:
   try-concur-replica-test:
     main:                Spec.hs
