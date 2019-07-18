@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 module Main where
 
 import P
@@ -10,7 +11,9 @@ import           Control.Concurrent     (threadDelay)
 import           Control.Exception
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import           Control.Monad.Base
 import           Control.ShiftMap
+
 --
 import           Concur.Core
 import           Concur.Replica
@@ -100,7 +103,21 @@ instance Monad m => MonadRoute r (RouteT r m) where
   getRoute = RouteT $ lift ask
   toRoute  = RouteT . throwError
 
+instance MonadIO m => MonadIO (RouteT r m) where
+  liftIO = RouteT . lift . lift . liftIO
+
+-- Orphan instance
+instance MonadBase (Widget HTML) (Widget HTML) where
+  liftBase = identity
+
+instance MonadBase b m => MonadBase b (RouteT r m) where
+  liftBase = RouteT . lift . lift . liftBase
+
+instance MonadTrans (RouteT r) where
+  lift = RouteT . lift . lift
+
 -- TODO: Is this implementation correct? I'm not sure what `ShiftMap` is.
+-- ??? If we stack more than two monad transformer, it could cause a trouble?
 instance ShiftMap m (RouteT r m) where
   shiftMap f (RouteT a) = RouteT $ mapExceptT (mapReaderT f) a
 
@@ -111,24 +128,26 @@ instance (Monad m, MonadSafeBlockingIO m) => MonadSafeBlockingIO (RouteT r m) wh
   liftSafeBlockingIO a = RouteT . lift . lift $ liftSafeBlockingIO a
 
 instance (Monad m, Alternative m) => Alternative (RouteT r m) where
-  empty = RouteT $ lift $ lift $ empty
+  empty = RouteT . lift . lift $ empty
   RouteT a <|> RouteT b = RouteT $ do
     r <- ask
-    v <- lift $ lift $ runReaderT (runExceptT a) r <|> runReaderT (runExceptT b) r
+    v <- lift . lift $ runReaderT (runExceptT a) r <|> runReaderT (runExceptT b) r
     case v of
       Left e  -> throwError e
       Right v -> pure v
 
-instance MonadIO m => MonadIO (RouteT r m) where
-  liftIO = RouteT . lift . lift . liftIO
-
 -- TODO: Explicit Multie alternative instance for performance
 
 
--- `concur-replica`'s `text` has a concrete result type `Widget HTML a`.
+-- Polymorphic version of `concur-replica`'s `text`.
 -- This code type checks, but I'm not sure if this implementation is correct.
-text' :: (Alternative m, ShiftMap (Widget HTML) m) => Text -> m a
-text' txt = shiftMap (const $ text txt) empty
+--
+--   text' :: (Alternative m, ShiftMap (Widget HTML) m) => Text -> m a
+--   text' txt = shiftMap (const $ text txt) empty
+--
+-- If we have `MonadBase (Widget HTML) (Widget HTML)` instance, its more straight forward.
+text' :: MonadBase (Widget HTML) m => Text -> m a
+text' = liftBase . text
 
 data Route = Home | About
 
@@ -143,22 +162,14 @@ home = do
     [ h1 [] [ text' "Home" ]
     , p [] [ text' "Welcome! You can play with a counter!" ]
     , manualCounter 0
-    , p []
-      [ text' "If you want to know about us, visit "
-      , link' About "about"
-      , text' "."
-      ]
+    , p [] [ text' "If you want to know about us, visit ", link' About "about", text' "." ]
     ]
 
 about :: _ => m a
 about = do
   div []
     [ h1 [] [ text' "About" ]
-    , p []
-      [ text' "Nothing to say. Just go "
-      , link' Home "home"
-      , text' "."
-      ]
+    , p [] [ text' "Nothing to say. Just go ", link' Home "home", text' "." ]
     ]
 
 manualCounter :: _ => Int -> m a
