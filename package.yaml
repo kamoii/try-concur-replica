@@ -73,6 +73,7 @@ dependencies:
 - websockets
 - warp
 - stm
+- mtl
 - transformers
 - transformers-base
 
@@ -120,7 +121,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - try-concur-replica
-    - mtl
 
 tests:
   try-concur-replica-test:
