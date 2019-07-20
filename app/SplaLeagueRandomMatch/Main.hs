@@ -3,6 +3,7 @@
 module Main where
 
 import P hiding (span)
+import qualified Relude.Extra.Enum as BEnum
 
 --
 import qualified Data.Text              as T
@@ -42,15 +43,42 @@ welcome ctx =
     , button [() <$ onClick] [ t "参加する" ]
     ]
 
+-- | text input
+
 -- Most of the time you won't need `onInput`, `onChange` is enough.
 inputOnChange :: _ => [Props Text] -> Text -> m Text
 inputOnChange props txt =
   input $ [ onChange <&> targetValue . target , value txt ] <> props
 
-inputOnChangeL :: _ => [Props Text] -> v -> Lens' v Text -> m v
-inputOnChangeL props v l =
-  inputOnChange props (v ^. l) <&> \t -> v & l .~ t
+-- | radio input
 
+radioGroup
+  :: _
+  => Text                            -- ^ Radio group name(must to be unique)
+  -> [(e, Text)]                     -- ^ Optoins and Label text
+  -> (m a -> ([Props e] -> m e) -> m e) -- ^ Render function with label and radio widgets as args
+  -> e                               -- ^ Current value
+  -> m e
+radioGroup gname opts f val =
+  orr $ opts & map \(e, txt) -> do
+    let label = text' txt
+    let props = [ type_ "radio", name gname, e <$ onChange, checked (e == val) ]
+    let radio props' = input $ props <> props'
+    f label radio
+
+-- Bounded, Enum
+radioGroupBEnum
+  :: _
+  => Text                            -- ^ Radio group name(must to be unique)
+  -> (e -> Text)                      -- ^ Label function
+  -> (m a -> ([Props e] -> m e) -> m e) -- ^ Render function with label and radio widgets as args
+  -> e                               -- ^ Current value
+  -> m e
+radioGroupBEnum gname lf f val =
+  radioGroup gname (map (\e -> (e, lf e)) BEnum.universe) f val
+
+withLens :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
+withLens v l f = f (v ^. l) <&> \a -> v & l .~ a
 
 -- untilRight を二回重ねることで validation 付きの form が可能。
 -- ただし realtime な validation ではなく、
@@ -78,7 +106,7 @@ data RankTai
   | RankAtoS        -- A- ~ S
   | RankSpToX200    -- S+ ~ X200
   | RankAboveX200   -- X200 ~
-  deriving (Eq, Show)
+  deriving (Eq, Show, Bounded, Enum)
 
 data Ika = Ika
   { ikaName :: Text
@@ -91,8 +119,9 @@ inputUser :: _ => m Ika
 inputUser = do
   i <- untilRight initial \i -> do
     div []
-      [ Left <$> inputOnChangeL [ placeholder "四号" ] i #ikaName
-      , Left <$> inputOnChangeL [ placeholder "1234-5678-9012" ] i #ikaFriendCode
+      [ Left <$> withLens i #ikaName (inputOnChange [ placeholder "四号" ])
+      , Left <$> withLens i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
+      , Left <$> withLens i #ikaRankTai (radioGroupBEnum "rank-tai" rankLabel rankRender)
       , Right <$> button [ () <$ onClick ] [ t "探す!" ]
       ]
   pure $ fst i
@@ -103,6 +132,18 @@ inputUser = do
       , ikaRankTai = RankAtoS
       , ikaNote = ""
       }
+
+    rankLabel = \case
+      RankCtoB      -> "C- ~ B+"
+      RankAtoS      -> "A- ~ S"
+      RankSpToX200  -> "S+ ~ X200"
+      RankAboveX200 -> "X200 <"
+
+    rankRender label radio = do
+      div []
+        [ label
+        , radio []
+        ]
 
 main :: IO ()
 main = do
