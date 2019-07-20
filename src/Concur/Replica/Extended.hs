@@ -8,7 +8,8 @@ import Control.Monad.Base
 import Control.ShiftMap
 --
 import Concur.Core
-import Concur.Replica
+import Concur.Replica hiding (t)
+-- t is just t :: Text -> Text. It should be a utility just closed to Concur.Replica
 
 -- | Additional functionalities for `Concur.Replica`
 -- | This module re-exports `Concur.Replica`, so you need to only import `Concur.Replica.Extended`
