@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE TypeApplications #-}
 module Main where
 
 import P hiding (span)
@@ -18,6 +19,7 @@ import           Control.ShiftMap
 import Control.Lens
 import Data.Generics.Product
 import Data.Generics.Labels
+import Data.Typeable (typeRep)
 
 --
 import           Concur.Core
@@ -66,16 +68,20 @@ radioGroup gname opts f val =
     let radio props' = input $ props <> props'
     f label radio
 
--- Bounded, Enum
+-- 簡易版。ほとんどの場合こちらでいいはず
+--   * Tpyeable を使って e の型名を name に (重複していないこと保証する必要あり)
+--   * Bounded, Enum が必要
 radioGroupBEnum
-  :: _
-  => Text                            -- ^ Radio group name(must to be unique)
-  -> (e -> Text)                      -- ^ Label function
+  :: forall e a m._
+  => (e -> Text)                      -- ^ Label function
   -> (m a -> ([Props e] -> m e) -> m e) -- ^ Render function with label and radio widgets as args
   -> e                               -- ^ Current value
   -> m e
-radioGroupBEnum gname lf f val =
-  radioGroup gname (map (\e -> (e, lf e)) BEnum.universe) f val
+radioGroupBEnum lf f val =
+  radioGroup
+    (show $ typeRep $ Proxy @e)
+    (map (\e -> (e, lf e)) BEnum.universe)
+    f val
 
 withLens :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
 withLens v l f = f (v ^. l) <&> \a -> v & l .~ a
@@ -121,7 +127,7 @@ inputUser = do
     div []
       [ Left <$> withLens i #ikaName (inputOnChange [ placeholder "四号" ])
       , Left <$> withLens i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
-      , Left <$> withLens i #ikaRankTai (radioGroupBEnum "rank-tai" rankLabel rankRender)
+      , Left <$> withLens i #ikaRankTai (radioGroupBEnum rankLabel rankRender)
       , Right <$> button [ () <$ onClick ] [ t "探す!" ]
       ]
   pure $ fst i
