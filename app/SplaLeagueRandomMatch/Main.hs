@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE OverloadedLabels #-}
 module Main where
 
 import P hiding (span)
@@ -14,6 +15,8 @@ import           Control.Monad.Reader
 import           Control.Monad.Base
 import           Control.ShiftMap
 import Control.Lens
+import Data.Generics.Product
+import Data.Generics.Labels
 
 --
 import           Concur.Core
@@ -32,7 +35,7 @@ getCurrentWaitingNum ctx = pure 4
 welcome :: _ => Ctx -> m ()
 welcome ctx =
   div []
-    [ h1 [] [ t "ぼっちのためのリグマ" ]
+    [ h1 [] [ t "ランダム・リグマ・マッチング" ]
     , p [] [ t "ランダムで、条件の近いイカとマッチングします。" ]
     , displaySTM (getCurrentWaitingNum ctx) $ \i -> span [] [ t $ show i ]
     , p [] [ t "参加します？" ]
@@ -75,28 +78,35 @@ data RankTai
   | RankAtoS        -- A- ~ S
   | RankSpToX200    -- S+ ~ X200
   | RankAboveX200   -- X200 ~
+  deriving (Eq, Show)
 
 data Ika = Ika
   { ikaName :: Text
   , ikaFriendCode :: Text
   , ikaRankTai :: RankTai
   , ikaNote :: Text
-  }
+  } deriving (Generic, Show)
 
-inputUser :: _ => m (Text, Text)
+inputUser :: _ => m Ika
 inputUser = do
-  i <- untilRight ("", "") \i -> do
+  i <- untilRight initial \i -> do
     div []
-      [ Left <$> inputOnChangeL [ placeholder "四号" ] i _1
-      , Left <$> inputOnChangeL [ placeholder "1234-5678-9012" ] i _2
+      [ Left <$> inputOnChangeL [ placeholder "四号" ] i #ikaName
+      , Left <$> inputOnChangeL [ placeholder "1234-5678-9012" ] i #ikaFriendCode
       , Right <$> button [ () <$ onClick ] [ t "探す!" ]
       ]
   pure $ fst i
-
+  where
+    initial = Ika
+      { ikaName = ""
+      , ikaFriendCode = ""
+      , ikaRankTai = RankAtoS
+      , ikaNote = ""
+      }
 
 main :: IO ()
 main = do
   runDefault 8080 "#リグマ" do
     welcome Ctx
-    _ <- inputUser
-    pure ()
+    ika <- inputUser
+    t $ show ika
