@@ -78,6 +78,7 @@ dependencies:
 - transformers-base
 - lens
 - generic-lens
+- pcre-heavy
 
 library:
   source-dirs: src

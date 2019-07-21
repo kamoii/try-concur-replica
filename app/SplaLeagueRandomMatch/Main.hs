@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Main where
 
 import P hiding (span, id, whenJust)
@@ -17,7 +18,7 @@ import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
 import           Control.Exception
 import           Control.Monad.Except
-import Control.Lens hiding (zoom, to)
+import Control.Lens hiding (zoom, to, re)
 import Data.Generics.Labels
 import Data.Typeable (typeRep)
 
@@ -106,12 +107,17 @@ inputUser = do
         , radio []
         ]
 
+    maxNameLength = 12
+    maxNoteLength = 32
+    codeRegex = [re|^((sw|SW|ＳＷ)(-|ー)?)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}$|]
+
     validate =
       let
-        name    = field #ikaName       $ to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan 20 !> [ "名前は20文字までです。"]
-        code    = field #ikaFriendCode $ to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> lessThan 30 !> [ "20文字までです" ]
+        lessThan' name len = lessThan len !> [ name <> "は" <> show len <> "文字以内に入力してください" ]
+        name    = field #ikaName       $ to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
+        code    = field #ikaFriendCode $ to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
         rankTai = field #ikaRankTai    $ id
-        note    = field #ikaNote       $ to T.strip >>> lessThan 32 !> [ "32文字までです" ]
+        note    = field #ikaNote       $ to T.strip >>> lessThan' "意気込み等" maxNoteLength
         v       = Ika <$> name <*> code <*> rankTai <*> note
       in pure . applyV v
 
