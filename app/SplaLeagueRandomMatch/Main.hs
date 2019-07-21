@@ -83,13 +83,35 @@ radioGroupBEnum lf f val =
     (map (\e -> (e, lf e)) BEnum.universe)
     f val
 
-withLens :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
-withLens v l f = f (v ^. l) <&> \a -> v & l .~ a
+-- focus?
+zoom' :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
+zoom' v l f = f (v ^. l) <&> \a -> v & l .~ a
 
 -- untilRight を二回重ねることで validation 付きの form が可能。
 -- ただし realtime な validation ではなく、
 untilRight :: Monad m => s -> (s -> m (Either s r)) -> m (s, r)
 untilRight s f = f s >>= either (flip untilRight f) (pure . (s,))
+
+-- realtime な validation ではない
+
+data Input i = Update i | Done
+
+inputWithValidation
+  :: _
+  => (i -> m (Either e r))             -- ^ Validate function(Don't show widgets)
+  -> i                                -- ^ Initial value
+  -> (Maybe (i, e) -> i -> m (Input i)) -- ^ Left i はループ、Right () is try to proceed
+  -> m r
+inputWithValidation validate initial render =
+  snd <$> untilRight (Nothing, initial) \(ieMaybe, i) -> do
+    v <- fst <$> untilRight i (inputToEither <<$>> render ieMaybe)
+    t <- validate v
+    pure case t of
+      Left e  -> Left (Just (v, e), v)
+      Right r -> Right r
+  where
+    inputToEither (Update i) = Left i
+    inputToEither Done = Right ()
 
 {-|
 
@@ -98,8 +120,8 @@ untilRight s f = f s >>= either (flip untilRight f) (pure . (s,))
  * ランク帯
    - C- ~ B+
    - A- ~ S
-   - S+ ~ X200
-   - X200 ~
+   - S+ ~ X2100
+   - X2100 ~
  * 使用武器、意気込みなど(任意)
 
 以下の要素は後でいいかな？
@@ -108,10 +130,10 @@ untilRight s f = f s >>= either (flip untilRight f) (pure . (s,))
 
 -}
 data RankTai
-  = RankCtoB        -- C- ~ B+
-  | RankAtoS        -- A- ~ S
-  | RankSpToX200    -- S+ ~ X200
-  | RankAboveX200   -- X200 ~
+  = RankCtoB         -- C- ~ B+
+  | RankAtoS         -- A- ~ S
+  | RankSpToX2100    -- S+ ~ X2100
+  | RankAboveX2100   -- X2100 ~
   deriving (Eq, Show, Bounded, Enum)
 
 data Ika = Ika
@@ -123,14 +145,14 @@ data Ika = Ika
 
 inputUser :: _ => m Ika
 inputUser = do
-  i <- untilRight initial \i -> do
+  inputWithValidation (pure . Right) initial \_ i ->
     div []
-      [ Left <$> withLens i #ikaName (inputOnChange [ placeholder "四号" ])
-      , Left <$> withLens i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
-      , Left <$> withLens i #ikaRankTai (radioGroupBEnum rankLabel rankRender)
-      , Right <$> button [ () <$ onClick ] [ t "探す!" ]
+      [ Update <$> zoom' i #ikaName (inputOnChange [ placeholder "四号" ])
+      , Update <$> zoom' i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
+      , Update <$> zoom' i #ikaRankTai (radioGroupBEnum rankLabel rankRender)
+      , Update <$> zoom' i #ikaNote (inputOnChange [ placeholder "使用武器、意気込み等" ])
+      , Done <$ button [ onClick ] [ t "探す!" ]
       ]
-  pure $ fst i
   where
     initial = Ika
       { ikaName = ""
@@ -140,16 +162,19 @@ inputUser = do
       }
 
     rankLabel = \case
-      RankCtoB      -> "C- ~ B+"
-      RankAtoS      -> "A- ~ S"
-      RankSpToX200  -> "S+ ~ X200"
-      RankAboveX200 -> "X200 <"
+      RankCtoB       -> "C- ~ B+"
+      RankAtoS       -> "A- ~ S"
+      RankSpToX2100  -> "S+ ~ X2100"
+      RankAboveX2100 -> "X2100 <"
 
     rankRender label radio = do
       div []
         [ label
         , radio []
         ]
+
+    validate ika = undefined
+
 
 main :: IO ()
 main = do
