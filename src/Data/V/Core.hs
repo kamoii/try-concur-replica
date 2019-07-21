@@ -48,6 +48,12 @@ instance Category (V e) where
   id = V Right
   (.) = flip andThen
 
+-- !! このライブラリは純粋に validatoin だけじゃないことに注意。
+-- !! そのため、例えば前後の無駄な空白を削るなどの処理もOK。
+
+to :: (i -> i') -> V e i i'
+to f = V $ Right . f
+
 -- 型パラメータの位置の関係で Bifunctorに出来無いため
 emap :: (e -> e') -> V e i o -> V e' i o
 emap f (V v) = V $ (first f) <$> v
@@ -94,8 +100,8 @@ andAlso f (V v0) (V v1) = V \i ->
 -- | alias for `sequenceA`.
 -- | 結果の t o どうしよう...
 -- TODO: delete? 多分使わない
-satisfyAll :: (Semigroup e, Traversable t) => t (V e i o) -> V e i (t o)
-satisfyAll = sequenceA
+-- satisfyAll :: (Semigroup e, Traversable t) => t (V e i o) -> V e i (t o)
+-- satisfyAll = sequenceA
 
 -- | Create `V` by prediction function. `True` means valid.
 fromPred :: (i -> Bool) -> V () i i

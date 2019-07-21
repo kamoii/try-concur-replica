@@ -20,7 +20,7 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.Base
 import           Control.ShiftMap
-import Control.Lens hiding (zoom)
+import Control.Lens hiding (zoom, to)
 import Data.Generics.Labels
 import Data.Typeable (typeRep)
 
@@ -86,9 +86,9 @@ radioGroupBEnum lf f val =
     (map (\e -> (e, lf e)) BEnum.universe)
     f val
 
--- focus?
--- 引数の順序としては Lens' v a -> (a -> m a) -> v -> mv のほうが綺麗だが
--- 微妙なことに Lens の `zoom` と名前が被っている。
+-- 引数の順序としては `Lens' v a -> (a -> m a) -> v -> mv` のほうが綺麗だが
+-- `(a -> m a)` を後ろに持ってきたほうが書きやすい。
+-- 微妙なことに Lens の `zoom` と名前が被っている。focus にする？
 zoom :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
 zoom v l f = f (v ^. l) <&> \a -> v & l .~ a
 
@@ -187,10 +187,10 @@ inputUser = do
 
     validate =
       let
-        name    = field #ikaName       $ notBlank !> ["名前は必須です"] >>> lessThan 20 !> [ "名前は20文字までです。"]
-        code    = field #ikaFriendCode $ notBlank !> [ "フレンドコードは必須です" ] >>> lessThan 30 !> [ "20文字までです" ]
-        rankTai = field #ikaRankTai      id
-        note    = field #ikaNote       $ lessThan 32 !> [ "32文字までです" ]
+        name    = field #ikaName       $ to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan 20 !> [ "名前は20文字までです。"]
+        code    = field #ikaFriendCode $ to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> lessThan 30 !> [ "20文字までです" ]
+        rankTai = field #ikaRankTai    $ id
+        note    = field #ikaNote       $ to T.strip >>> lessThan 32 !> [ "32文字までです" ]
         v       = Ika <$> name <*> code <*> rankTai <*> note
       in pure . applyV v
 
