@@ -48,12 +48,14 @@ instance Category (V e) where
   id = V Right
   (.) = flip andThen
 
+-- 型パラメータの位置の関係で Bifunctorに出来無いため
 emap :: (e -> e') -> V e i o -> V e' i o
 emap f (V v) = V $ (first f) <$> v
 
 (<!>) = emap
 infixl 4 <!>
 
+-- これさすがに名前微妙か？
 (&<!>) = flip emap
 infixl 1 &<!>
 
@@ -65,6 +67,7 @@ infixl 4 <!
 (!>) = flip (<!)
 infixl 4 !>
 
+-- うーん、名前しっくりこない
 field :: Lens' v i -> V e i o -> V e v o
 field l = lmap (view l)
 
@@ -75,6 +78,7 @@ andThen' (V v0) (V v1) =
   V $ first Left <$> v0 >=> first Right <$> v1
 
 -- | Alias for Category's `>>>`
+-- TODO: delete?
 andThen :: V e i o -> V e o o' -> V e i o'
 andThen v0 v1 = andThen' v0 v1 &<!> (either id id)
 
@@ -89,6 +93,7 @@ andAlso f (V v0) (V v1) = V \i ->
 
 -- | alias for `sequenceA`.
 -- | 結果の t o どうしよう...
+-- TODO: delete? 多分使わない
 satisfyAll :: (Semigroup e, Traversable t) => t (V e i o) -> V e i (t o)
 satisfyAll = sequenceA
 

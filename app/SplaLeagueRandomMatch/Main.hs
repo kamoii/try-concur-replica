@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Main where
 
-import P hiding (span, id)
+import P hiding (span, id, whenJust)
 import Control.Category (id)
 import Data.V.Core as V
 import Data.V.Text as V
@@ -20,7 +20,7 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.Base
 import           Control.ShiftMap
-import Control.Lens
+import Control.Lens hiding (zoom)
 import Data.Generics.Labels
 import Data.Typeable (typeRep)
 
@@ -87,13 +87,21 @@ radioGroupBEnum lf f val =
     f val
 
 -- focus?
-zoom' :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
-zoom' v l f = f (v ^. l) <&> \a -> v & l .~ a
+-- 引数の順序としては Lens' v a -> (a -> m a) -> v -> mv のほうが綺麗だが
+-- 微妙なことに Lens の `zoom` と名前が被っている。
+zoom :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
+zoom v l f = f (v ^. l) <&> \a -> v & l .~ a
 
 -- untilRight を二回重ねることで validation 付きの form が可能。
 -- ただし realtime な validation ではなく、
 untilRight :: Monad m => s -> (s -> m (Either s r)) -> m (s, r)
-untilRight s f = f s >>= either (flip untilRight f) (pure . (s,))
+untilRight s f =
+  f s >>= either (flip untilRight f) (pure . (s,))
+
+whenJust :: Alternative m => Maybe a -> (a -> m v) -> m v
+whenJust m f = case m of
+  Just a -> f a
+  Nothing -> empty
 
 -- realtime な validation ではない
 
@@ -103,14 +111,14 @@ inputWithValidation
   :: _
   => (i -> m (Either e r))             -- ^ Validate function(Don't show widgets)
   -> i                                -- ^ Initial value
-  -> (Maybe (i, e) -> i -> m (Input i)) -- ^ Left i はループ、Right () is try to proceed
+  -> (Maybe e -> i -> m (Input i))      -- ^ Left i はループ、Right () is try to proceed
   -> m r
 inputWithValidation validate initial render =
   snd <$> untilRight (Nothing, initial) \(ieMaybe, i) -> do
     v <- fst <$> untilRight i (inputToEither <<$>> render ieMaybe)
     t <- validate v
     pure case t of
-      Left e  -> Left (Just (v, e), v)
+      Left e  -> Left (Just e, v)
       Right r -> Right r
   where
     inputToEither (Update i) = Left i
@@ -148,12 +156,13 @@ data Ika = Ika
 
 inputUser :: _ => m Ika
 inputUser = do
-  inputWithValidation validate initial \_ i ->
+  inputWithValidation validate initial \e i ->
     div []
-      [ Update <$> zoom' i #ikaName (inputOnChange [ placeholder "四号" ])
-      , Update <$> zoom' i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
-      , Update <$> zoom' i #ikaRankTai (radioGroupBEnum rankLabel rankRender)
-      , Update <$> zoom' i #ikaNote (inputOnChange [ placeholder "使用武器、意気込み等" ])
+      [ whenJust e \errs -> div [] (map t errs)
+      , Update <$> zoom i #ikaName (inputOnChange [ placeholder "四号" ])
+      , Update <$> zoom i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
+      , Update <$> zoom i #ikaRankTai (radioGroupBEnum rankLabel rankRender)
+      , Update <$> zoom i #ikaNote (inputOnChange [ placeholder "使用武器、意気込み等" ])
       , Done <$ button [ onClick ] [ t "探す!" ]
       ]
   where
@@ -176,17 +185,14 @@ inputUser = do
         , radio []
         ]
 
-    v :: V [Text] Ika Ika
-    v =
+    validate =
       let
         name    = field #ikaName       $ notBlank !> ["名前は必須です"] >>> lessThan 20 !> [ "名前は20文字までです。"]
         code    = field #ikaFriendCode $ notBlank !> [ "フレンドコードは必須です" ] >>> lessThan 30 !> [ "20文字までです" ]
         rankTai = field #ikaRankTai      id
         note    = field #ikaNote       $ lessThan 32 !> [ "32文字までです" ]
-      in
-        Ika <$> name <*> code <*> rankTai <*> note
-
-    validate = pure . applyV v
+        v       = Ika <$> name <*> code <*> rankTai <*> note
+      in pure . applyV v
 
 
 main :: IO ()
