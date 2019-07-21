@@ -17,9 +17,6 @@ import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
 import           Control.Exception
 import           Control.Monad.Except
-import           Control.Monad.Reader
-import           Control.Monad.Base
-import           Control.ShiftMap
 import Control.Lens hiding (zoom, to)
 import Data.Generics.Labels
 import Data.Typeable (typeRep)
@@ -28,10 +25,9 @@ import Data.Typeable (typeRep)
 import           Concur.Core
 import           Concur.Replica.Extended hiding (id)
 import           Concur.Replica.STM
-
--- TODO: quasi-quoter for text'。埋込み可能、改行は br
-t :: _ => _
-t = text'
+import           Concur.Replica.Control.Misc
+import           Concur.Replica.Control.Validation
+import           Concur.Replica.Widget.Input
 
 data Ctx = Ctx
 
@@ -48,81 +44,6 @@ welcome ctx =
     , button [() <$ onClick] [ t "参加する" ]
     ]
 
--- | text input
-
--- Most of the time you won't need `onInput`, `onChange` is enough.
-inputOnChange :: _ => [Props Text] -> Text -> m Text
-inputOnChange props txt =
-  input $ [ onChange <&> targetValue . target , value txt ] <> props
-
--- | radio input
-
-radioGroup
-  :: _
-  => Text                            -- ^ Radio group name(must to be unique)
-  -> [(e, Text)]                     -- ^ Optoins and Label text
-  -> (m a -> ([Props e] -> m e) -> m e) -- ^ Render function with label and radio widgets as args
-  -> e                               -- ^ Current value
-  -> m e
-radioGroup gname opts f val =
-  orr $ opts & map \(e, txt) -> do
-    let label = text' txt
-    let props = [ type_ "radio", name gname, e <$ onChange, checked (e == val) ]
-    let radio props' = input $ props <> props'
-    f label radio
-
--- 簡易版。ほとんどの場合こちらでいいはず
---   * Tpyeable を使って e の型名を name に (重複していないこと保証する必要あり)
---   * Bounded, Enum が必要
-radioGroupBEnum
-  :: forall e a m._
-  => (e -> Text)                      -- ^ Label function
-  -> (m a -> ([Props e] -> m e) -> m e) -- ^ Render function with label and radio widgets as args
-  -> e                               -- ^ Current value
-  -> m e
-radioGroupBEnum lf f val =
-  radioGroup
-    (show $ typeRep $ Proxy @e)
-    (map (\e -> (e, lf e)) BEnum.universe)
-    f val
-
--- 引数の順序としては `Lens' v a -> (a -> m a) -> v -> mv` のほうが綺麗だが
--- `(a -> m a)` を後ろに持ってきたほうが書きやすい。
--- 微妙なことに Lens の `zoom` と名前が被っている。focus にする？
-zoom :: Functor m => v -> Lens' v a -> (a -> m a) -> m v
-zoom v l f = f (v ^. l) <&> \a -> v & l .~ a
-
--- untilRight を二回重ねることで validation 付きの form が可能。
--- ただし realtime な validation ではなく、
-untilRight :: Monad m => s -> (s -> m (Either s r)) -> m (s, r)
-untilRight s f =
-  f s >>= either (flip untilRight f) (pure . (s,))
-
-whenJust :: Alternative m => Maybe a -> (a -> m v) -> m v
-whenJust m f = case m of
-  Just a -> f a
-  Nothing -> empty
-
--- realtime な validation ではない
-
-data Input i = Update i | Done
-
-inputWithValidation
-  :: _
-  => (i -> m (Either e r))             -- ^ Validate function(Don't show widgets)
-  -> i                                -- ^ Initial value
-  -> (Maybe e -> i -> m (Input i))      -- ^ Left i はループ、Right () is try to proceed
-  -> m r
-inputWithValidation validate initial render =
-  snd <$> untilRight (Nothing, initial) \(ieMaybe, i) -> do
-    v <- fst <$> untilRight i (inputToEither <<$>> render ieMaybe)
-    t <- validate v
-    pure case t of
-      Left e  -> Left (Just e, v)
-      Right r -> Right r
-  where
-    inputToEither (Update i) = Left i
-    inputToEither Done = Right ()
 
 {-|
 

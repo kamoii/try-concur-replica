@@ -1,0 +1,49 @@
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TypeApplications #-}
+module Concur.Replica.Widget.Input where
+
+import P
+import Relude.Extra.Type (typeName)
+import qualified Relude.Extra.Enum as BEnum
+
+
+import Concur.Core
+import Concur.Replica.Extended
+
+-- | text input
+
+-- Most of the time you won't need `onInput`, `onChange` is enough.
+inputOnChange :: _ => [Props Text] -> Text -> m Text
+inputOnChange props txt =
+  input $ [ onChange <&> targetValue . target , value txt ] <> props
+
+-- | Radio button
+
+radioGroup
+  :: _
+  => Text                            -- ^ Radio group name(must to be unique)
+  -> [(e, Text)]                     -- ^ Optoins and Label text
+  -> (m a -> ([Props e] -> m e) -> m e) -- ^ Render function with label and radio widgets as args
+  -> e                               -- ^ Current value
+  -> m e
+radioGroup gname opts f val =
+  orr $ opts & map \(e, txt) -> do
+    let label = text' txt
+    let props = [ type_ "radio", name gname, e <$ onChange, checked (e == val) ]
+    let radio props' = input $ props <> props'
+    f label radio
+
+-- 簡易版。ほとんどの場合こちらでいいはず
+--   * Tpyeable を使って e の型名を name に (重複していないこと保証する必要あり)
+--   * Bounded, Enum が必要
+radioGroupBEnum
+  :: forall e a m._
+  => (e -> Text)                      -- ^ Label function
+  -> (m a -> ([Props e] -> m e) -> m e) -- ^ Render function with label and radio widgets as args
+  -> e                               -- ^ Current value
+  -> m e
+radioGroupBEnum lf f val =
+  radioGroup
+    (show $ typeName @e)
+    (map (\e -> (e, lf e)) BEnum.universe)
+    f val

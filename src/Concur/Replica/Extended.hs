@@ -35,3 +35,7 @@ text' = liftBase . text
 
 text'' :: (ShiftMap (Widget HTML) m, Alternative m) => Text -> m a
 text'' txt = shift (text txt)
+
+-- TODO: quasi-quoter for text'。埋込み可能、改行は br
+t :: _ => _
+t = text'

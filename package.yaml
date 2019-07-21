@@ -76,6 +76,8 @@ dependencies:
 - mtl
 - transformers
 - transformers-base
+- lens
+- generic-lens
 
 library:
   source-dirs: src
@@ -131,8 +133,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - try-concur-replica
-    - lens
-    - generic-lens
 
 tests:
   try-concur-replica-test:
