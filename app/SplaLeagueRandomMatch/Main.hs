@@ -1,9 +1,13 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 module Main where
 
-import P hiding (span)
+import P hiding (span, id)
+import Control.Category (id)
+import Data.V.Core as V
+import Data.V.Text as V
 import qualified Relude.Extra.Enum as BEnum
 
 --
@@ -17,13 +21,12 @@ import           Control.Monad.Reader
 import           Control.Monad.Base
 import           Control.ShiftMap
 import Control.Lens
-import Data.Generics.Product
 import Data.Generics.Labels
 import Data.Typeable (typeRep)
 
 --
 import           Concur.Core
-import           Concur.Replica.Extended
+import           Concur.Replica.Extended hiding (id)
 import           Concur.Replica.STM
 
 -- TODO: quasi-quoter for text'。埋込み可能、改行は br
@@ -145,7 +148,7 @@ data Ika = Ika
 
 inputUser :: _ => m Ika
 inputUser = do
-  inputWithValidation (pure . Right) initial \_ i ->
+  inputWithValidation validate initial \_ i ->
     div []
       [ Update <$> zoom' i #ikaName (inputOnChange [ placeholder "四号" ])
       , Update <$> zoom' i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
@@ -173,7 +176,17 @@ inputUser = do
         , radio []
         ]
 
-    validate ika = undefined
+    v :: V [Text] Ika Ika
+    v =
+      let
+        name    = field #ikaName       $ notBlank !> ["名前は必須です"] >>> lessThan 20 !> [ "名前は20文字までです。"]
+        code    = field #ikaFriendCode $ notBlank !> [ "フレンドコードは必須です" ] >>> lessThan 30 !> [ "20文字までです" ]
+        rankTai = field #ikaRankTai      id
+        note    = field #ikaNote       $ lessThan 32 !> [ "32文字までです" ]
+      in
+        Ika <$> name <*> code <*> rankTai <*> note
+
+    validate = pure . applyV v
 
 
 main :: IO ()
