@@ -18,7 +18,7 @@ import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
 import           Control.Exception
 import           Control.Monad.Except
-import Control.Lens hiding (zoom, to, re)
+import Control.Lens hiding (zoom, to, re, matching)
 import Data.Generics.Labels
 import Data.Typeable (typeRep)
 
@@ -46,7 +46,7 @@ welcome ctx =
     ]
 
 
-{-|
+{-| 入力画面
 
  * フレンドコード(※1 マッチ後にのみ表示されます)
  * 名前
@@ -76,8 +76,8 @@ data Ika = Ika
   , ikaNote :: Text
   } deriving (Generic, Show)
 
-inputUser :: _ => m Ika
-inputUser = do
+inputUser :: _ => Ika -> m Ika
+inputUser initial = do
   inputWithValidation validate initial \e i ->
     div []
       [ whenJust e \errs -> div [] (map t errs)
@@ -88,13 +88,6 @@ inputUser = do
       , Done <$ button [ onClick ] [ t "探す!" ]
       ]
   where
-    initial = Ika
-      { ikaName = ""
-      , ikaFriendCode = ""
-      , ikaRankTai = RankAtoS
-      , ikaNote = ""
-      }
-
     rankLabel = \case
       RankCtoB       -> "C- ~ B+"
       RankAtoS       -> "A- ~ S"
@@ -121,10 +114,50 @@ inputUser = do
         v       = Ika <$> name <*> code <*> rankTai <*> note
       in pure . applyV v
 
+{-| マッチング待機画面
+
+ * キャンセル可能
+-}
+
+data WaitingResult
+  = WCancel
+  | WTimeout
+  | WMacted
+  deriving Eq
+
+matching :: _ => Ctx -> Ika -> m WaitingResult
+matching ctx ika = do
+  div []
+    [ WTimeout <$ countdown 10 \i -> t $ show i
+    , WCancel <$ button [ onClick ] [ t "cancel" ]
+    ]
+
+-- | カウントダウン
+-- | 0 も一秒間表示されることに注意。その後、() が発火する。
+countdown :: _ => Int -> (forall a. Int -> m a) -> m ()
+countdown i f =
+  if i < 0
+  then pure ()
+  else do
+    _ <- liftIO (threadDelay (1 * 1000 * 1009)) <|> f i
+    countdown (i-1) f
 
 main :: IO ()
 main = do
+  let ctx = Ctx
   runDefault 8080 "#リグマ" do
-    welcome Ctx
-    ika <- inputUser
-    t $ show ika
+    welcome ctx
+    untilRight initial \i' -> do
+      i <- inputUser i'
+      r <- matching ctx i
+      case r of
+        WTimeout -> pure $ Left i
+        WCancel  -> pure $ Left i
+
+  where
+    initial = Ika
+      { ikaName = ""
+      , ikaFriendCode = ""
+      , ikaRankTai = RankAtoS
+      , ikaNote = ""
+      }
