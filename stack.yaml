@@ -30,7 +30,7 @@ resolver: lts-13.29
 #   - wai
 packages:
 - .
-- dep/concur-replica
+- /home/sino/mygithub/concur-replica
 - /home/sino/mygithub/replica
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as
