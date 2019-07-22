@@ -48,6 +48,12 @@ instance Category (V e) where
   id = V Right
   (.) = flip andThen
 
+-- | `lmap` の lens版
+-- `generic-lens` との組合せれば、Fooデータ型の特定のフィールド foo に
+-- フォーカスした場合、`lmapL #foo` と書けて便利
+lmapL :: Profunctor (f e) => Lens' v i -> f e i o -> f e v o
+lmapL l = lmap (view l)
+
 -- !! このライブラリは純粋に validatoin だけじゃないことに注意。
 -- !! そのため、例えば前後の無駄な空白を削るなどの処理もOK。
 
@@ -72,10 +78,6 @@ infixl 4 <!
 (!>) :: V e i o -> e' -> V e' i o
 (!>) = flip (<!)
 infixl 4 !>
-
--- うーん、名前しっくりこない
-field :: Lens' v i -> V e i o -> V e v o
-field l = lmap (view l)
 
 -- either
 -- 左辺のエラーか右辺のエラー

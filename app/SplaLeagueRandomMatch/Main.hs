@@ -83,7 +83,7 @@ inputUser = do
       [ whenJust e \errs -> div [] (map t errs)
       , Update <$> zoom i #ikaName (inputOnChange [ placeholder "四号" ])
       , Update <$> zoom i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
-      , Update <$> zoom i #ikaRankTai (radioGroupBEnum rankLabel rankRender)
+      , Update <$> zoom i #ikaRankTai (radioGroupBEnum rankRender)
       , Update <$> zoom i #ikaNote (inputOnChange [ placeholder "使用武器、意気込み等" ])
       , Done <$ button [ onClick ] [ t "探す!" ]
       ]
@@ -101,9 +101,9 @@ inputUser = do
       RankSpToX2100  -> "S+ ~ X2100"
       RankAboveX2100 -> "X2100 <"
 
-    rankRender label radio = do
+    rankRender rank radio = do
       div []
-        [ label
+        [ t $ rankLabel rank
         , radio []
         ]
 
@@ -114,10 +114,10 @@ inputUser = do
     validate =
       let
         lessThan' name len = lessThan len !> [ name <> "は" <> show len <> "文字以内に入力してください" ]
-        name    = field #ikaName       $ to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
-        code    = field #ikaFriendCode $ to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
-        rankTai = field #ikaRankTai    $ id
-        note    = field #ikaNote       $ to T.strip >>> lessThan' "意気込み等" maxNoteLength
+        name    = lmapL #ikaName       $ to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
+        code    = lmapL #ikaFriendCode $ to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
+        rankTai = lmapL #ikaRankTai    $ id
+        note    = lmapL #ikaNote       $ to T.strip >>> lessThan' "意気込み等" maxNoteLength
         v       = Ika <$> name <*> code <*> rankTai <*> note
       in pure . applyV v
 
