@@ -14,10 +14,9 @@ import Data.Generics.Labels
 Applicative インスタンスの実装を変えたものか、json/html form に特化し
 たライブラリだけが見つかる。
 
- * 単に
-   andThen と and
+ * Applicative の instance は accumlative
+ * Cateogry
 
-Appicative (accumlative な)やつだよ!
 sequenceA :: Applicative f => t (f a) -> f (t a) 活用できるざ
 
 -- bifunctor
@@ -26,8 +25,9 @@ sequenceA :: Applicative f => t (f a) -> f (t a) 活用できるざ
 i, e の位置変える？ Profunctor にするか Bifunctor にするか
 profunctor にして e を変換するのは
 
-open sum error?
-monadic parameter m?
+Open-sum(variant) error support?
+Add monadic parameter m?
+Alternative instance?
 -}
 
 -- conV or Validate
