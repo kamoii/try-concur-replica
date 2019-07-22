@@ -128,7 +128,7 @@ data WaitingResult
 matching :: _ => Ctx -> Ika -> m WaitingResult
 matching ctx ika = do
   div []
-    [ WTimeout <$ countdown 10 \i -> t $ show i
+    [ WTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
     , WCancel <$ button [ onClick ] [ t "cancel" ]
     ]
 
