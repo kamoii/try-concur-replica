@@ -139,7 +139,7 @@ matching ctx ika = do
       if i < 0
       then pure ()
       else do
-        _ <- liftIO (threadDelay (1 * 1000 * 1009)) <|> f i
+        _ <- liftIO (threadDelay (1 * 1000 * 1000)) <|> f i
         countdown (i-1) f
 
 main :: IO ()
