@@ -31,9 +31,23 @@ import           Concur.Replica.Control.Validation
 import           Concur.Replica.Widget.Input
 
 data Ctx = Ctx
+data Room = Room
 
 getCurrentWaitingNum :: Ctx -> STM Int
 getCurrentWaitingNum ctx = pure 4
+
+--
+-- m r が発火するまでにマッチングできれば `Left Room`、マッチングが
+-- 間に合わなければ `Right r` が返る。
+--
+--  * ika を登録すると id 発行する
+--  * id に対して抜けるのを
+--    - matching待ちなら キャンセル
+--    - room に居るなら退出
+--
+-- TODO: 例外対応。これが一番難しい
+tryMatching :: _ => Ctx -> Ika -> m r -> m (Either Room r)
+tryMatching ctx ika m = Right <$> m
 
 welcome :: _ => Ctx -> m ()
 welcome ctx =
@@ -122,15 +136,17 @@ inputUser initial = do
 data WaitingResult
   = WCancel
   | WTimeout
-  | WMacted
+  | WMacthed
   deriving Eq
 
 matching :: _ => Ctx -> Ika -> m WaitingResult
 matching ctx ika = do
-  div []
-    [ WTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
-    , WCancel <$ button [ onClick ] [ t "cancel" ]
-    ]
+  r <- tryMatching ctx ika $
+    div []
+      [ WTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
+      , WCancel <$ button [ onClick ] [ t "cancel" ]
+      ]
+  pure $ either (const WMacthed) id r
   where
     -- | カウントダウン
     -- | 0 も一秒間表示されることに注意。その後、() が発火する。
