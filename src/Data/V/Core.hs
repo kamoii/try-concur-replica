@@ -28,6 +28,11 @@ profunctor にして e を変換するのは
 Open-sum(variant) error support?
 Add monadic parameter m?
 Alternative instance?
+
+Category と Applicative の性質が異なるのはいいのか？
+一方は Either-like、もう一方は Validation-like
+うーん、生の Either/Validation を >=> で結合していくのとそんなに変わらない？
+いや、面倒か？あと emap 系が定義できんよな
 -}
 
 -- conV or Validate
@@ -56,7 +61,7 @@ lmapL l = lmap (view l)
 
 -- !! このライブラリは純粋に validatoin だけじゃないことに注意。
 -- !! そのため、例えば前後の無駄な空白を削るなどの処理もOK。
-
+-- 名前、`idmap` でもいい気がしてきた。あ、id自体が何もしない map の意味を含んんでるから駄目か...
 to :: (i -> i') -> V e i i'
 to f = V $ Right . f
 

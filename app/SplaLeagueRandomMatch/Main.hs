@@ -58,7 +58,7 @@ welcome ctx =
  * 使用武器、意気込みなど(任意)
 
 以下の要素は後でいいかな？
-  通話ありなし
+  通話ありなし(*これはいるかも)
   雰囲気
 
 -}
@@ -131,16 +131,16 @@ matching ctx ika = do
     [ WTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
     , WCancel <$ button [ onClick ] [ t "cancel" ]
     ]
-
--- | カウントダウン
--- | 0 も一秒間表示されることに注意。その後、() が発火する。
-countdown :: _ => Int -> (forall a. Int -> m a) -> m ()
-countdown i f =
-  if i < 0
-  then pure ()
-  else do
-    _ <- liftIO (threadDelay (1 * 1000 * 1009)) <|> f i
-    countdown (i-1) f
+  where
+    -- | カウントダウン
+    -- | 0 も一秒間表示されることに注意。その後、() が発火する。
+    countdown :: _ => Int -> (forall a. Int -> m a) -> m ()
+    countdown i f =
+      if i < 0
+      then pure ()
+      else do
+        _ <- liftIO (threadDelay (1 * 1000 * 1009)) <|> f i
+        countdown (i-1) f
 
 main :: IO ()
 main = do
