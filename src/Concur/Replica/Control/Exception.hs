@@ -13,7 +13,6 @@ import Control.Exception (SomeException, mask_, try)
 
 -}
 
-
 newtype ReleaseStack = ReleaseStack (IORef [IO ()])
 
 acquire :: IO ReleaseStack

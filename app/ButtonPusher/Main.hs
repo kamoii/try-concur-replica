@@ -9,6 +9,8 @@ import           Control.Concurrent.STM (retry, check)
 --
 import           Concur.Core
 import           Concur.Replica
+import qualified Concur.Replica.Control.Exception as E
+import           Network.WebSockets.Connection   (ConnectionOptions, defaultConnectionOptions)
 
 -- | Dumbest online game in the world.
 --
@@ -19,8 +21,10 @@ main :: IO ()
 main = do
   participantNum <- newTVarIO 0
   counter        <- newTVarIO 0
-  runDefault 8080 "Button Pusher" $ forever $ do
-    liftIO $ atomically $ modifyTVar' participantNum (+1)
+  run 8080 (defaultIndex "Button Pusher" mempty) defaultConnectionOptions P.id
+    (atomically $ modifyTVar' participantNum (+1))
+    (const $ atomically $ modifyTVar' participantNum (+(-1)))
+    $ const $ do
     div []
       [ h1 [] [ text "Button Pusher!" ]
       , p  [] [ text "Dumbest online game in the world. Just enjoy how the counter goes up." ]
@@ -29,6 +33,7 @@ main = do
       , forever $ do
           button [ onClick ] [ text "Increment Counter" ]
           liftIO $ atomically $ modifyTVar' counter (+1)
+      , button [ onClick ] [ text "end" ]
       ]
 
 displayTVar :: Eq v => TVar v -> (v -> Widget HTML Void) -> Widget HTML a
