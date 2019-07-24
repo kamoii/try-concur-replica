@@ -7,6 +7,7 @@ module Main where
 
 import P hiding (span, id, whenJust)
 import Control.Category (id)
+import Data.Profunctor.Product ((***!))
 import Data.V.Core as V
 import Data.V.Text as V
 import qualified Relude.Extra.Enum as BEnum
@@ -45,8 +46,26 @@ Context が自分が死ぬ時に自分の後片付けを行なう。多分効率
 -}
 
 data Ctx = Ctx
-data Room = Room
-  { roomMembers :: [Ika]
+
+data BaseInfo = BaseInfo
+  { ikaName :: Text
+  , ikaFriendCode :: Text
+  , ikaNote :: Text
+  } deriving (Generic, Show)
+
+data RankTai
+  = RankCtoB         -- C- ~ B+
+  | RankAtoS         -- A- ~ S
+  | RankSpToX2100    -- S+ ~ X2100
+  | RankAboveX2100   -- X2100 ~
+  deriving (Eq, Show, Bounded, Enum)
+
+data MatchingCondition = MatchingCondition
+  { mcRankTai :: RankTai
+  } deriving (Generic, Show)
+
+data Match = Match
+  { roomMembers :: [MatchingCondition]
   }
 
 getCurrentWaitingNum :: Ctx -> STM Int
@@ -56,10 +75,10 @@ getCurrentWaitingNum ctx = pure 4
 -- つまり参加していない状態にする。基本的に部屋に入った状態はキャンセルしたくないが、
 -- ちょうどユーザとキャンセルボタンを押した直後にマッチングしてしまった場合など。
 --
--- 二番目の `IO Room` はマッチングするまでブロックする。マッチすると Room が返る。
+-- 二番目の `IO Match` はマッチングするまでブロックする。マッチすると Match が返る。
 --
 -- TODO: canceler というか detacher ? のほうがいいかもな
-startMatching :: Ctx -> IO (IO (), IO Room)
+startMatching :: Ctx -> IO (IO (), IO Match)
 startMatching ctx = do
   pure (pure (), ioBlock)
 
@@ -90,29 +109,15 @@ welcome ctx =
   雰囲気
 
 -}
-data RankTai
-  = RankCtoB         -- C- ~ B+
-  | RankAtoS         -- A- ~ S
-  | RankSpToX2100    -- S+ ~ X2100
-  | RankAboveX2100   -- X2100 ~
-  deriving (Eq, Show, Bounded, Enum)
-
-data Ika = Ika
-  { ikaName :: Text
-  , ikaFriendCode :: Text
-  , ikaRankTai :: RankTai
-  , ikaNote :: Text
-  } deriving (Generic, Show)
-
-inputUser :: _ => Ika -> m Ika
-inputUser initial = do
+inputCondition :: _ => (BaseInfo, MatchingCondition) -> m (BaseInfo, MatchingCondition)
+inputCondition initial = do
   inputWithValidation validate initial \e i ->
     div []
       [ whenJust e \errs -> div [] (map t errs)
-      , Update <$> zoom i #ikaName (inputOnChange [ placeholder "四号" ])
-      , Update <$> zoom i #ikaFriendCode (inputOnChange [ placeholder "1234-5678-9012" ])
-      , Update <$> zoom i #ikaRankTai (radioGroupBEnum rankRender)
-      , Update <$> zoom i #ikaNote (inputOnChange [ placeholder "使用武器、意気込み等" ])
+      , Update <$> zoom i (_1 . #ikaName) (inputOnChange [ placeholder "四号" ])
+      , Update <$> zoom i (_1 . #ikaFriendCode) (inputOnChange [ placeholder "1234-5678-9012" ])
+      , Update <$> zoom i (_2 . #mcRankTai) (radioGroupBEnum rankRender)
+      , Update <$> zoom i (_1 . #ikaNote) (inputOnChange [ placeholder "使用武器、意気込み等" ])
       , Done <$ button [ onClick ] [ t "探す!" ]
       ]
   where
@@ -132,14 +137,18 @@ inputUser initial = do
     maxNoteLength = 32
     codeRegex = [re|^((sw|SW|ＳＷ)(-|ー)?)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}$|]
 
+    -- V e BaseInfo BaseInfo
     validate =
       let
         lessThan' name len = lessThan len !> [ name <> "は" <> show len <> "文字以内に入力してください" ]
-        name    = lmapL #ikaName       $ to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
-        code    = lmapL #ikaFriendCode $ to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
-        rankTai = lmapL #ikaRankTai    $ id
-        note    = lmapL #ikaNote       $ to T.strip >>> lessThan' "意気込み等" maxNoteLength
-        v       = Ika <$> name <*> code <*> rankTai <*> note
+        name    = to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
+        code    = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
+        note    = to T.strip >>> lessThan' "意気込み等" maxNoteLength
+        bi      :: V _ BaseInfo BaseInfo
+        bi      = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
+        mc      :: V _ MatchingCondition MatchingCondition
+        mc      = MatchingCondition <$> lmapL #mcRankTai id
+        v       = bi ***! mc
       in pure . applyV v
 
 {-| マッチング待機画面
@@ -155,7 +164,7 @@ data MatchingFailed
   | MFTimeout
   deriving Eq
 
-matching :: _ => E.ReleaseStack -> Ctx -> Ika -> (Room -> m r) -> m (Either MatchingFailed r)
+matching :: _ => E.ReleaseStack -> Ctx -> (BaseInfo, MatchingCondition) -> (Match -> m r) -> m (Either MatchingFailed r)
 matching rs ctx ika cb = do
   let acq = startMatching ctx
   let rel = \(canceler, _) -> canceler
@@ -192,7 +201,7 @@ matching rs ctx ika cb = do
  * 退出ボタン(押しまちがいを防ぐ仕組みは必要かな)
 -}
 
-league :: _ => Ctx -> Room -> m ()
+league :: _ => Ctx -> Match -> m ()
 league = undefined
 
 main :: IO ()
@@ -202,8 +211,8 @@ main = do
   let ctx = Ctx
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
     welcome ctx
-    untilRight initial \i' -> do
-      i <- inputUser i'
+    untilRight (initialBaseInfo,initialMc) \i' -> do
+      i <- inputCondition i'
       r <- matching rs ctx i \room -> pure ()
       case r of
         Left MFTimeout -> pure $ Left i
@@ -211,9 +220,11 @@ main = do
         Right _        -> pure $ Left i
 
   where
-    initial = Ika
+    initialBaseInfo = BaseInfo
       { ikaName = ""
       , ikaFriendCode = ""
-      , ikaRankTai = RankAtoS
       , ikaNote = ""
+      }
+    initialMc = MatchingCondition
+      { mcRankTai = RankAtoS
       }

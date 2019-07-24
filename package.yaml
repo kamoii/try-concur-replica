@@ -79,6 +79,7 @@ dependencies:
 - lens
 - generic-lens
 - pcre-heavy
+- product-profunctors
 
 library:
   source-dirs: src
