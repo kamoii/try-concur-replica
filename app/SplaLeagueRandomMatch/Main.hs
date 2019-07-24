@@ -182,6 +182,19 @@ matching rs ctx ika cb = do
         _ <- liftIO (threadDelay (1 * 1000 * 1000)) <|> f i
         countdown (i-1) f
 
+{-| リーグ画面
+
+現状は即座に部屋に入るでいい気がするな。不満があれば
+
+ * 他の人の状態
+ * 他の人のフレコ、部屋立ての人を決定
+ * チャット
+ * 退出ボタン(押しまちがいを防ぐ仕組みは必要かな)
+-}
+
+league :: _ => Ctx -> Room -> m ()
+league = undefined
+
 main :: IO ()
 main = do
   let index = defaultIndex "#リグマ" mempty
