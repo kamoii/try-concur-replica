@@ -21,6 +21,8 @@ import           Control.Monad.Except
 import Control.Lens hiding (zoom, to, re, matching)
 import Data.Generics.Labels
 import Data.Typeable (typeRep)
+import           Network.WebSockets.Connection   (ConnectionOptions, defaultConnectionOptions)
+
 
 --
 import           Concur.Core
@@ -28,26 +30,38 @@ import           Concur.Replica.Extended hiding (id)
 import           Concur.Replica.STM
 import           Concur.Replica.Control.Misc
 import           Concur.Replica.Control.Validation
+import qualified Concur.Replica.Control.Exception as E
 import           Concur.Replica.Widget.Input
+
+-- for test/development
+ioBlock :: IO a
+ioBlock = threadDelay (1 * 1000 * 1000 * 1000 * 1000) *> undefined
+
+{-
+生存及び死亡の区別を誰が責任持つかだよな。
+Context が自分が死ぬ時に自分の後片付けを行なう。多分効率がいいけど、抜けがありそう。
+逆に管理thread に自分の生存かいなかを管理できるものを渡してその thread に任せる？
+抜けはなさそうだけど効率は悪いかな(thread は前Context の生存状態を監視する必要あり)
+-}
 
 data Ctx = Ctx
 data Room = Room
+  { roomMembers :: [Ika]
+  }
 
 getCurrentWaitingNum :: Ctx -> STM Int
 getCurrentWaitingNum ctx = pure 4
 
+-- 最初の `IO ()` は canceler。マッチング待ちや、部屋に入った状態をキャンセルする。
+-- つまり参加していない状態にする。基本的に部屋に入った状態はキャンセルしたくないが、
+-- ちょうどユーザとキャンセルボタンを押した直後にマッチングしてしまった場合など。
 --
--- m r が発火するまでにマッチングできれば `Left Room`、マッチングが
--- 間に合わなければ `Right r` が返る。
+-- 二番目の `IO Room` はマッチングするまでブロックする。マッチすると Room が返る。
 --
---  * ika を登録すると id 発行する
---  * id に対して抜けるのを
---    - matching待ちなら キャンセル
---    - room に居るなら退出
---
--- TODO: 例外対応。これが一番難しい
-tryMatching :: _ => Ctx -> Ika -> m r -> m (Either Room r)
-tryMatching ctx ika m = Right <$> m
+-- TODO: canceler というか detacher ? のほうがいいかもな
+startMatching :: Ctx -> IO (IO (), IO Room)
+startMatching ctx = do
+  pure (pure (), ioBlock)
 
 welcome :: _ => Ctx -> m ()
 welcome ctx =
@@ -131,23 +145,33 @@ inputUser initial = do
 {-| マッチング待機画面
 
  * キャンセル可能
+
+回線が途中で切られることも想定する必要がある。その場合適切にマッチング
+候補から外したり、部屋から退出させる必要がある。
 -}
 
-data WaitingResult
-  = WCancel
-  | WTimeout
-  | WMacthed
+data MatchingFailed
+  = MFCancel
+  | MFTimeout
   deriving Eq
 
-matching :: _ => Ctx -> Ika -> m WaitingResult
-matching ctx ika = do
-  r <- tryMatching ctx ika $
-    div []
-      [ WTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
-      , WCancel <$ button [ onClick ] [ t "cancel" ]
-      ]
-  pure $ either (const WMacthed) id r
+matching :: _ => E.ReleaseStack -> Ctx -> Ika -> (Room -> m r) -> m (Either MatchingFailed r)
+matching rs ctx ika cb = do
+  let acq = startMatching ctx
+  let rel = \(canceler, _) -> canceler
+  E.pbracket rs acq rel $ \(_, roomWait) -> do
+      r <- orr
+        [ Right <$> liftIO roomWait
+        , Left <$> div []
+          [ MFTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
+          , MFCancel <$ button [ onClick ] [ t "cancel" ]
+          ]
+        ]
+      case r of
+        Left err   -> pure $ Left err
+        Right room -> Right <$> cb room
   where
+
     -- | カウントダウン
     -- | 0 も一秒間表示されることに注意。その後、() が発火する。
     countdown :: _ => Int -> (forall a. Int -> m a) -> m ()
@@ -160,15 +184,18 @@ matching ctx ika = do
 
 main :: IO ()
 main = do
+  let index = defaultIndex "#リグマ" mempty
+  let wsopt = defaultConnectionOptions
   let ctx = Ctx
-  runDefault 8080 "#リグマ" do
+  run 8080 index wsopt id E.acquire E.release $ \rs -> do
     welcome ctx
     untilRight initial \i' -> do
       i <- inputUser i'
-      r <- matching ctx i
+      r <- matching rs ctx i \room -> pure ()
       case r of
-        WTimeout -> pure $ Left i
-        WCancel  -> pure $ Left i
+        Left MFTimeout -> pure $ Left i
+        Left MFCancel  -> pure $ Left i
+        Right _        -> pure $ Left i
 
   where
     initial = Ika
