@@ -7,7 +7,6 @@ module Main where
 
 import P hiding (span, id, whenJust)
 import Control.Category (id)
-import Data.Profunctor.Product ((***!))
 import Data.V.Core as V
 import Data.V.Text as V
 import qualified Relude.Extra.Enum as BEnum
@@ -137,18 +136,15 @@ inputCondition initial = do
     maxNoteLength = 32
     codeRegex = [re|^((sw|SW|ＳＷ)(-|ー)?)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}$|]
 
-    -- V e BaseInfo BaseInfo
     validate =
       let
         lessThan' name len = lessThan len !> [ name <> "は" <> show len <> "文字以内に入力してください" ]
         name    = to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
         code    = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
         note    = to T.strip >>> lessThan' "意気込み等" maxNoteLength
-        bi      :: V _ BaseInfo BaseInfo
         bi      = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
-        mc      :: V _ MatchingCondition MatchingCondition
         mc      = MatchingCondition <$> lmapL #mcRankTai id
-        v       = bi ***! mc
+        v       = (,) <$> lmap fst bi <*> lmap snd mc
       in pure . applyV v
 
 {-| マッチング待機画面

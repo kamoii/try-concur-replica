@@ -53,6 +53,9 @@ import Control.Lens
 -> いや、ProductProfunctor なるものが....
 https://hackage.haskell.org/package/product-profunctors-0.10.0.0/docs/Data-Profunctor-Product.html#v:-42--42--42--33-
 まさしく求めてた accumulative な V e (i,i') (o,o') への結合じゃん
+
+いや、というか Applicative/Profunctor だけでいけるじゃん...
+\f g -> (,) <$> lmap fst f <*> lmap snd g
 -}
 
 {-| 合成可能な validtion ライブラリ
