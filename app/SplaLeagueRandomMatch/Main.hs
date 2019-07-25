@@ -11,8 +11,6 @@ import qualified Relude.Extra.Enum as BEnum
 import qualified Data.Text              as T
 import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
-import           Control.Exception
-import           Control.Monad.Except
 import Control.Lens hiding (zoom, to, re, matching)
 import Data.Generics.Labels
 import Data.V.Core as V
@@ -65,6 +63,7 @@ inputCondition initial = do
         [ zoom i (_1 . #ikaName) $ inputOnChange [ placeholder "四号" ]
         , zoom i (_1 . #ikaFriendCode) $ inputOnChange [ placeholder "1234-5678-9012" ]
         , zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
+        , zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
         , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "使用武器、意気込み等" ]
         ]
       , Done <$ button [ onClick ] [ t "探す!" ]
@@ -82,6 +81,17 @@ inputCondition initial = do
         , radio []
         ]
 
+    tuuwaLabel = \case
+      TuuwaAri -> "通話あり"
+      TuuwaNashi -> "通話なし"
+      TuuwaEither -> "どちらでも良い"
+
+    tuuwaRender tuuwa radio = do
+      div []
+        [ radio []
+        , t $ tuuwaLabel tuuwa
+        ]
+
     maxNameLength = 12
     maxNoteLength = 32
     codeRegex = [re|^((sw|SW|ＳＷ)(-|ー)?)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}$|]
@@ -94,7 +104,7 @@ inputCondition initial = do
         code = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
         note = to T.strip >>> lessThan' "意気込み等" maxNoteLength
         bi   = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
-        mc   = MatchingCondition <$> lmapL #mcRankTai id
+        mc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
         v    = (,) <$> lmap fst bi <*> lmap snd mc
       in pure . applyV v
 
@@ -181,4 +191,5 @@ main = do
       }
     initialMc = MatchingCondition
       { mcRankTai = RankAtoS
+      , mcTuuwa = TuuwaEither
       }

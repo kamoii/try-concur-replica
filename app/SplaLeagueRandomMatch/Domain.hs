@@ -23,6 +23,13 @@ import           Control.Concurrent     (threadDelay)
 
 Concur 及び Replica 関連のコードがこの Domainモジュールに混ってはいけない。
 -}
+
+{- | STM設計
+
+これ難しいな。
+入れ子はあまり望ましくないがしかたないか？
+最小限がいいのか、最浅がいいのか?
+-}
 {-
 生存及び死亡の区別を誰が責任持つかだよな。
 Context が自分が死ぬ時に自分の後片付けを行なう。多分効率がいいけど、抜けがありそう。
@@ -31,6 +38,8 @@ Context が自分が死ぬ時に自分の後片付けを行なう。多分効率
 -}
 
 data Ctx = Ctx
+
+newtype ID = ID Int
 
 data BaseInfo = BaseInfo
   { ikaName :: Text
@@ -45,12 +54,37 @@ data RankTai
   | RankAboveX2100   -- X2100 ~
   deriving (Eq, Show, Bounded, Enum)
 
+data Tuuwa
+  = TuuwaAri
+  | TuuwaNashi
+  | TuuwaEither
+  deriving (Eq, Show, Bounded, Enum)
+
 data MatchingCondition = MatchingCondition
   { mcRankTai :: RankTai
+  , mcTuuwa :: Tuuwa
   } deriving (Generic, Show)
 
+data MatchMemberState
+  = MSPresent      -- ^ 在籍
+  | MSDisappeared  -- ^ 回線切れ
+  | MSExited       -- ^ 退出済み
+
+data MatchMember = MatchMember
+  { memId :: ID
+  , memBaseInfo :: BaseInfo
+  , memMatchingCondition :: MatchingCondition
+  }
+
+data MatchEvent
+  = EVMemberStateChange MatchMember MatchMemberState
+  | EVMemberGreeting MatchMember
+  | EvComment MatchMember Text
+
 data Match = Match
-  { roomMembers :: [MatchingCondition]
+  { matchMatchMembers :: [(MatchMember, TVar MatchMemberState)]
+  , matchEvents :: TVar (Seq MatchEvent)
+  , matchRankTai :: RankTai
   }
 
 -- | 現在の待ち人数を取得する。

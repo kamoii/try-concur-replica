@@ -5,6 +5,9 @@ import P
 import Concur.Replica.Control.Misc
 
 -- realtime な validation ではない
+-- このスタイルだと入力型にフィールドが追加されたとしても例外にならん。
+-- 若干変更に弱い...
+-- zoom がまずいのか？
 
 data Input i = Update i | Done
 
