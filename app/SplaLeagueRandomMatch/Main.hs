@@ -113,10 +113,12 @@ inputCondition initial = do
   inputWithValidation validate initial \e i ->
     div []
       [ whenJust e \errs -> div [] (map t errs)
-      , Update <$> zoom i (_1 . #ikaName) (inputOnChange [ placeholder "四号" ])
-      , Update <$> zoom i (_1 . #ikaFriendCode) (inputOnChange [ placeholder "1234-5678-9012" ])
-      , Update <$> zoom i (_2 . #mcRankTai) (radioGroupBEnum rankRender)
-      , Update <$> zoom i (_1 . #ikaNote) (inputOnChange [ placeholder "使用武器、意気込み等" ])
+      , Update <$> div []
+        [ zoom i (_1 . #ikaName) $ inputOnChange [ placeholder "四号" ]
+        , zoom i (_1 . #ikaFriendCode) $ inputOnChange [ placeholder "1234-5678-9012" ]
+        , zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
+        , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "使用武器、意気込み等" ]
+        ]
       , Done <$ button [ onClick ] [ t "探す!" ]
       ]
   where
@@ -160,7 +162,13 @@ data MatchingFailed
   | MFTimeout
   deriving Eq
 
-matching :: _ => E.ReleaseStack -> Ctx -> (BaseInfo, MatchingCondition) -> (Match -> m r) -> m (Either MatchingFailed r)
+matching
+  :: _
+  => E.ReleaseStack
+  -> Ctx
+  -> (BaseInfo, MatchingCondition)
+  -> (Match -> m r)
+  -> m (Either MatchingFailed r)
 matching rs ctx ika cb = do
   let acq = startMatching ctx
   let rel = \(canceler, _) -> canceler
