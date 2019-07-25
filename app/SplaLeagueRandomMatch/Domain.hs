@@ -15,13 +15,10 @@ import qualified Data.Text              as T
 import           Text.Read              (readMaybe)
 import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
---
-import           Concur.Core
-import           Concur.Replica.Extended hiding (id)
 
 -- for test/development
 ioBlock :: IO a
-ioBlock = threadDelay (1 * 1000 * 1000 * 1000 * 1000) *> undefined
+ioBlock = forever $ threadDelay (1 * 1000 * 1000 * 1000 * 1000)
 
 {-
 生存及び死亡の区別を誰が責任持つかだよな。
