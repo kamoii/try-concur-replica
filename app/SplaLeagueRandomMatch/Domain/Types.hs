@@ -5,16 +5,9 @@
 
 module Domain.Types where
 
-import P hiding (span, id, whenJust)
-import Control.Category (id)
-import Data.V.Core as V
-import Data.V.Text as V
+import P
 import qualified Relude.Extra.Enum as BEnum
 --
-import qualified Data.Text              as T
-import           Text.Read              (readMaybe)
-import           Control.Concurrent.STM (retry, check)
-import           Control.Concurrent     (threadDelay)
 
 
 data Ctx = Ctx
