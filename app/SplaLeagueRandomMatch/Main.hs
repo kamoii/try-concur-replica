@@ -7,24 +7,18 @@ module Main where
 
 import P hiding (span, id, whenJust)
 import Control.Category (id)
-import Data.V.Core as V
-import Data.V.Text as V
 import qualified Relude.Extra.Enum as BEnum
-
---
 import qualified Data.Text              as T
-import           Text.Read              (readMaybe)
 import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
 import           Control.Exception
 import           Control.Monad.Except
 import Control.Lens hiding (zoom, to, re, matching)
 import Data.Generics.Labels
-import Data.Typeable (typeRep)
-import           Network.WebSockets.Connection   (ConnectionOptions, defaultConnectionOptions)
-
-
+import Data.V.Core as V
+import Data.V.Text as V
 --
+import           Network.WebSockets.Connection   (ConnectionOptions, defaultConnectionOptions)
 import           Concur.Core
 import           Concur.Replica.Extended hiding (id)
 import           Concur.Replica.STM
@@ -32,54 +26,8 @@ import           Concur.Replica.Control.Misc
 import           Concur.Replica.Control.Validation
 import qualified Concur.Replica.Control.Exception as E
 import           Concur.Replica.Widget.Input
-
--- for test/development
-ioBlock :: IO a
-ioBlock = threadDelay (1 * 1000 * 1000 * 1000 * 1000) *> undefined
-
-{-
-生存及び死亡の区別を誰が責任持つかだよな。
-Context が自分が死ぬ時に自分の後片付けを行なう。多分効率がいいけど、抜けがありそう。
-逆に管理thread に自分の生存かいなかを管理できるものを渡してその thread に任せる？
-抜けはなさそうだけど効率は悪いかな(thread は前Context の生存状態を監視する必要あり)
--}
-
-data Ctx = Ctx
-
-data BaseInfo = BaseInfo
-  { ikaName :: Text
-  , ikaFriendCode :: Text
-  , ikaNote :: Text
-  } deriving (Generic, Show)
-
-data RankTai
-  = RankCtoB         -- C- ~ B+
-  | RankAtoS         -- A- ~ S
-  | RankSpToX2100    -- S+ ~ X2100
-  | RankAboveX2100   -- X2100 ~
-  deriving (Eq, Show, Bounded, Enum)
-
-data MatchingCondition = MatchingCondition
-  { mcRankTai :: RankTai
-  } deriving (Generic, Show)
-
-data Match = Match
-  { roomMembers :: [MatchingCondition]
-  }
-
-getCurrentWaitingNum :: Ctx -> STM Int
-getCurrentWaitingNum ctx = pure 4
-
--- 最初の `IO ()` は canceler。マッチング待ちや、部屋に入った状態をキャンセルする。
--- つまり参加していない状態にする。基本的に部屋に入った状態はキャンセルしたくないが、
--- ちょうどユーザとキャンセルボタンを押した直後にマッチングしてしまった場合など。
 --
--- 二番目の `IO Match` はマッチングするまでブロックする。マッチすると Match が返る。
---
--- TODO: canceler というか detacher ? のほうがいいかもな
-startMatching :: Ctx -> IO (IO (), IO Match)
-startMatching ctx = do
-  pure (pure (), ioBlock)
+import Domain
 
 welcome :: _ => Ctx -> m ()
 welcome ctx =
@@ -138,15 +86,16 @@ inputCondition initial = do
     maxNoteLength = 32
     codeRegex = [re|^((sw|SW|ＳＷ)(-|ー)?)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}$|]
 
+    -- TODO: validation ルールはドメインの話だよね
     validate =
       let
         lessThan' name len = lessThan len !> [ name <> "は" <> show len <> "文字以内に入力してください" ]
-        name    = to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
-        code    = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
-        note    = to T.strip >>> lessThan' "意気込み等" maxNoteLength
-        bi      = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
-        mc      = MatchingCondition <$> lmapL #mcRankTai id
-        v       = (,) <$> lmap fst bi <*> lmap snd mc
+        name = to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
+        code = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
+        note = to T.strip >>> lessThan' "意気込み等" maxNoteLength
+        bi   = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
+        mc   = MatchingCondition <$> lmapL #mcRankTai id
+        v    = (,) <$> lmap fst bi <*> lmap snd mc
       in pure . applyV v
 
 {-| マッチング待機画面
@@ -170,6 +119,7 @@ matching
   -> (Match -> m r)
   -> m (Either MatchingFailed r)
 matching rs ctx ika cb = do
+  -- TODO: ここで bracket パターンなのはここの責務じゃない気がしますね。
   let acq = startMatching ctx
   let rel = \(canceler, _) -> canceler
   E.pbracket rs acq rel $ \(_, roomWait) -> do
