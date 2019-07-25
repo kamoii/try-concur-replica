@@ -2,8 +2,10 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE QuasiQuotes #-}
-module Domain where
+module Domain
+  ( module Domain.Types
+  , module Domain
+  ) where
 
 import P hiding (span, id, whenJust)
 import Control.Category (id)
@@ -15,6 +17,8 @@ import qualified Data.Text              as T
 import           Text.Read              (readMaybe)
 import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
+
+import Domain.Types
 
 {- | ドメインコード
 
@@ -37,55 +41,6 @@ Context が自分が死ぬ時に自分の後片付けを行なう。多分効率
 抜けはなさそうだけど効率は悪いかな(thread は前Context の生存状態を監視する必要あり)
 -}
 
-data Ctx = Ctx
-
-newtype ID = ID Int
-
-data BaseInfo = BaseInfo
-  { ikaName :: Text
-  , ikaFriendCode :: Text
-  , ikaNote :: Text
-  } deriving (Generic, Show)
-
-data RankTai
-  = RankCtoB         -- C- ~ B+
-  | RankAtoS         -- A- ~ S
-  | RankSpToX2100    -- S+ ~ X2100
-  | RankAboveX2100   -- X2100 ~
-  deriving (Eq, Show, Bounded, Enum)
-
-data Tuuwa
-  = TuuwaAri
-  | TuuwaNashi
-  | TuuwaEither
-  deriving (Eq, Show, Bounded, Enum)
-
-data MatchingCondition = MatchingCondition
-  { mcRankTai :: RankTai
-  , mcTuuwa :: Tuuwa
-  } deriving (Generic, Show)
-
-data MatchMemberState
-  = MSPresent      -- ^ 在籍
-  | MSDisappeared  -- ^ 回線切れ
-  | MSExited       -- ^ 退出済み
-
-data MatchMember = MatchMember
-  { memId :: ID
-  , memBaseInfo :: BaseInfo
-  , memMatchingCondition :: MatchingCondition
-  }
-
-data MatchEvent
-  = EVMemberStateChange MatchMember MatchMemberState
-  | EVMemberGreeting MatchMember
-  | EvComment MatchMember Text
-
-data Match = Match
-  { matchMatchMembers :: [(MatchMember, TVar MatchMemberState)]
-  , matchEvents :: TVar (Seq MatchEvent)
-  , matchRankTai :: RankTai
-  }
 
 -- | 現在の待ち人数を取得する。
 getCurrentWaitingNum :: Ctx -> STM Int
