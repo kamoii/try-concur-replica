@@ -16,10 +16,13 @@ import           Text.Read              (readMaybe)
 import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
 
--- for test/development
-ioBlock :: IO a
-ioBlock = forever $ threadDelay (1 * 1000 * 1000 * 1000 * 1000)
+{- | ドメインコード
 
+ドメインの一貫性を保つのが責務。このモジュールから提供する関数を使っている範囲では、
+ドメインの一貫性が損なわれないことを保証する必要がある。
+
+Concur 及び Replica 関連のコードがこの Domainモジュールに混ってはいけない。
+-}
 {-
 生存及び死亡の区別を誰が責任持つかだよな。
 Context が自分が死ぬ時に自分の後片付けを行なう。多分効率がいいけど、抜けがありそう。
@@ -66,3 +69,8 @@ getCurrentWaitingNum ctx = pure 4
 startMatching :: Ctx -> IO (IO (), IO Match)
 startMatching ctx = do
   pure (pure (), ioBlock)
+
+
+-- for test/development
+ioBlock :: IO a
+ioBlock = forever $ threadDelay (1 * 1000 * 1000 * 1000 * 1000)
