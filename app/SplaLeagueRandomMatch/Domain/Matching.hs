@@ -30,12 +30,6 @@ data MatchingQueue id = MatchingQueue
   { mqQueue :: Array RankTai [(id, MatchingCondition)]
   }
 
-{- | STM操作
-mkMatchingQueue
-addAndChoose
-cancel id
--}
-
 allIds :: Array RankTai [(id, MatchingCondition)] -> [id]
 allIds = map fst . foldl' (<>) []
 
@@ -53,13 +47,9 @@ addAndTryMatch MatchingQueue{mqQueue} v@(id, cond) = do
   when (elem id (allIds mqQueue)) $ Left AlreadyInTheQueue
   let rankTai  = mcRankTai cond
   let que      = (mqQueue ! rankTai) <> [v]
-  case simpleMatching que of
-    Nothing -> do
-      let mqQueue' = mqQueue // [(rankTai,que)]
-      pure (MatchingQueue mqQueue', Nothing)
-    Just (matches, leftovers) -> do
-      let mqQueue' = mqQueue // [(rankTai,leftovers)]
-      pure (MatchingQueue mqQueue', Just matches)
+  pure $ case simpleMatching que of
+    Just (matches, leftovers) -> (MatchingQueue (mqQueue // [(rankTai,leftovers)]), Just matches)
+    Nothing                   -> (MatchingQueue (mqQueue // [(rankTai,que)]), Nothing)
 
 cancel :: Ord id => id -> MatchingQueue id -> MatchingQueue id
 cancel id MatchingQueue{mqQueue} =
