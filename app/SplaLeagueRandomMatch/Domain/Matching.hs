@@ -18,6 +18,7 @@ import Domain.Types
 
 data MatchingError
   = AlreadyInTheQueue
+  | IdNotFound
   deriving (Eq, Show)
 
 instance Exception MatchingError
@@ -25,7 +26,6 @@ instance Exception MatchingError
 -- Array は total に作成する必要あり
 data MatchingQueue id = MatchingQueue
   { mqQueue :: Array RankTai [(id, MatchingCondition)]
-  , mqIdMap :: Map id (id, MatchingCondition)
   }
 
 {- | STM操作
@@ -34,9 +34,12 @@ addAndChoose
 cancel id
 -}
 
+allIds :: Array RankTai [(id, MatchingCondition)] -> [id]
+allIds = map fst . foldl' (<>) []
+
 mkMatchingQueue :: Ord id => MatchingQueue id
 mkMatchingQueue =
-  MatchingQueue (benumArray (const [])) mempty
+  MatchingQueue (benumArray (const []))
 
 -- 既に同一idで登録している場合は例外を投げる
 addAndTryMatch
@@ -44,19 +47,17 @@ addAndTryMatch
   => MatchingQueue id
   -> (id, MatchingCondition)
   -> Either MatchingError (MatchingQueue id, Maybe [(id, MatchingCondition)])
-addAndTryMatch MatchingQueue{mqQueue, mqIdMap} v@(id, cond) = do
-  whenJust (mqIdMap ^. at id) \_ -> Left AlreadyInTheQueue
+addAndTryMatch MatchingQueue{mqQueue} v@(id, cond) = do
+  when (elem id (allIds mqQueue)) $ Left AlreadyInTheQueue
   let rankTai  = mcRankTai cond
-  let mqIdMap' = mqIdMap & at id .~ Just v
   let que      = (mqQueue ! rankTai) <> [v]
   case simpleMatching que of
     Nothing -> do
       let mqQueue' = mqQueue // [(rankTai,que)]
-      pure (MatchingQueue mqQueue' mqIdMap', Nothing)
+      pure (MatchingQueue mqQueue', Nothing)
     Just (matches, leftovers) -> do
       let mqQueue' = mqQueue // [(rankTai,leftovers)]
-      let mqIdMap'' = foldl' (\m id -> m & at id .~ Nothing) mqIdMap' (map fst matches)
-      pure (MatchingQueue mqQueue' mqIdMap'', Just matches)
+      pure (MatchingQueue mqQueue', Just matches)
 
 {- | マッチングアルゴリズム
 
