@@ -9,11 +9,26 @@ import Data.Generics.Labels
 
 import Domain.Types
 
+data MatchingQueue = MatchingQueue
+  { queue :: Int
+  }
+
+{- | STM操作
+addAndChoose
+cancel id
+-}
 
 {- | マッチングアルゴリズム
 
  * ランク帯が混じることなし
  * 通話あり・なし・どちらでも
+
+つまり条件のものよっては混じらないものと混じるものがある。
+
+ * ランク帯は完全に混じらない
+ * 通話に関しては通話あり・なしは交わらないが「どちらでも」はあり・なし両方と交わる
+
+以下のアルゴリズムは上記に特化したものだが、一般化できそう...
 
 --
 先頭を優先して、マッチングさせる。
