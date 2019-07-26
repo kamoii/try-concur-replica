@@ -3,8 +3,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NamedFieldPuns #-}
 module Domain.Matching
-  ( MatchingQueue
+  ( MatchingError(..)
+  , MatchingQueue
   , mkMatchingQueue
+  , addAndTryMatch
+  , cancel
   ) where
 
 import P
@@ -18,7 +21,6 @@ import Domain.Types
 
 data MatchingError
   = AlreadyInTheQueue
-  | IdNotFound
   deriving (Eq, Show)
 
 instance Exception MatchingError
@@ -58,6 +60,10 @@ addAndTryMatch MatchingQueue{mqQueue} v@(id, cond) = do
     Just (matches, leftovers) -> do
       let mqQueue' = mqQueue // [(rankTai,leftovers)]
       pure (MatchingQueue mqQueue', Just matches)
+
+cancel :: Ord id => id -> MatchingQueue id -> MatchingQueue id
+cancel id MatchingQueue{mqQueue} =
+  MatchingQueue $ mqQueue <&> filter ((/=id) . fst)
 
 {- | マッチングアルゴリズム
 
