@@ -1,22 +1,62 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Domain.Matching where
+{-# LANGUAGE NamedFieldPuns #-}
+module Domain.Matching
+  ( MatchingQueue
+  , mkMatchingQueue
+  ) where
 
 import P
+import Control.Concurrent.STM
 import Control.Lens
 import Data.Generics.Labels
+import Data.Array.Extended (Array, benumArray, (!), (//))
+import qualified Data.Map as M
 
 import Domain.Types
 
-data MatchingQueue = MatchingQueue
-  { queue :: Int
+data MatchingError
+  = AlreadyInTheQueue
+  deriving (Eq, Show)
+
+instance Exception MatchingError
+
+-- Array は total に作成する必要あり
+data MatchingQueue id = MatchingQueue
+  { mqQueue :: Array RankTai [(id, MatchingCondition)]
+  , mqIdMap :: Map id (id, MatchingCondition)
   }
 
 {- | STM操作
+mkMatchingQueue
 addAndChoose
 cancel id
 -}
+
+mkMatchingQueue :: Ord id => MatchingQueue id
+mkMatchingQueue =
+  MatchingQueue (benumArray (const [])) mempty
+
+-- 既に同一idで登録している場合は例外を投げる
+addAndTryMatch
+  :: Ord id
+  => MatchingQueue id
+  -> (id, MatchingCondition)
+  -> Either MatchingError (MatchingQueue id, Maybe [(id, MatchingCondition)])
+addAndTryMatch MatchingQueue{mqQueue, mqIdMap} v@(id, cond) = do
+  whenJust (mqIdMap ^. at id) \_ -> Left AlreadyInTheQueue
+  let rankTai  = mcRankTai cond
+  let mqIdMap' = mqIdMap & at id .~ Just v
+  let que      = (mqQueue ! rankTai) <> [v]
+  case simpleMatching que of
+    Nothing -> do
+      let mqQueue' = mqQueue // [(rankTai,que)]
+      pure (MatchingQueue mqQueue' mqIdMap', Nothing)
+    Just (matches, leftovers) -> do
+      let mqQueue' = mqQueue // [(rankTai,leftovers)]
+      let mqIdMap'' = foldl' (\m id -> m & at id .~ Nothing) mqIdMap' (map fst matches)
+      pure (MatchingQueue mqQueue' mqIdMap'', Just matches)
 
 {- | マッチングアルゴリズム
 
@@ -41,14 +81,14 @@ cancel id
 simpleMatching
   :: forall  id. Eq id
   => [(id, MatchingCondition)]
-  -> Maybe ([id], [(id, MatchingCondition)])
+  -> Maybe ([(id, MatchingCondition)], [(id, MatchingCondition)])
 simpleMatching ms
   | length ms < 4 = Nothing
   | otherwise = do
       chosen <- chosen'
       let ids = map (view $ _2 . _1) chosen
       let others = filter (\i -> not $ elem (fst i) ids) seven
-      pure (ids, others <> tails)
+      pure (map snd chosen, others <> tails)
   where
     seven  = take 7 ms
     tuuwaL = _2 . _2 . #mcTuuwa

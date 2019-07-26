@@ -65,6 +65,8 @@ dependencies:
 - relude
 - text
 - bytestring
+- containers
+- array
 - concur-core
 - concur-replica
 - replica
@@ -73,6 +75,7 @@ dependencies:
 - websockets
 - warp
 - stm
+# - stm-containers
 - mtl
 - transformers
 - transformers-base

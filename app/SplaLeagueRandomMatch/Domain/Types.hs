@@ -6,6 +6,7 @@
 module Domain.Types where
 
 import P
+import Data.Array (Ix)
 import qualified Relude.Extra.Enum as BEnum
 --
 
@@ -25,7 +26,7 @@ data RankTai
   | RankAtoS         -- A- ~ S
   | RankSpToX2100    -- S+ ~ X2100
   | RankAboveX2100   -- X2100 ~
-  deriving (Eq, Show, Bounded, Enum)
+  deriving (Ix, Eq, Ord, Show, Bounded, Enum)
 
 data Tuuwa
   = TuuwaAri
