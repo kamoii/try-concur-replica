@@ -4,7 +4,10 @@
 {-# LANGUAGE TypeApplications #-}
 module Domain
   ( module Domain.Types
-  , module Domain
+  , Ctx
+  , mkCtx
+  , getCurrentWaitingNum
+  , startMatching
   ) where
 
 import P hiding (span, id, whenJust)
@@ -19,6 +22,7 @@ import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent     (threadDelay)
 
 import Domain.Types
+import qualified Domain.Matching as D
 
 {- | ドメインコード
 
@@ -28,12 +32,6 @@ import Domain.Types
 Concur 及び Replica 関連のコードがこの Domainモジュールに混ってはいけない。
 -}
 
-{- | STM設計
-
-これ難しいな。
-入れ子はあまり望ましくないがしかたないか？
-最小限がいいのか、最浅がいいのか?
--}
 {-
 生存及び死亡の区別を誰が責任持つかだよな。
 Context が自分が死ぬ時に自分の後片付けを行なう。多分効率がいいけど、抜けがありそう。
@@ -41,6 +39,14 @@ Context が自分が死ぬ時に自分の後片付けを行なう。多分効率
 抜けはなさそうだけど効率は悪いかな(thread は前Context の生存状態を監視する必要あり)
 -}
 
+data Ctx = Ctx
+  { ctxQueue :: TVar (D.MatchingQueue ID)
+  }
+
+mkCtx :: IO Ctx
+mkCtx = do
+  q <- newTVarIO D.mkMatchingQueue
+  pure $ Ctx q
 
 -- | 現在の待ち人数を取得する。
 getCurrentWaitingNum :: Ctx -> STM Int

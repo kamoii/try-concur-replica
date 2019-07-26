@@ -172,7 +172,7 @@ main :: IO ()
 main = do
   let index = defaultIndex "#リグマ" mempty
   let wsopt = defaultConnectionOptions
-  let ctx = Ctx
+  ctx <- mkCtx
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
     welcome ctx
     untilRight (initialBaseInfo,initialMc) \i' -> do

@@ -10,10 +10,8 @@ import Data.Array (Ix)
 import qualified Relude.Extra.Enum as BEnum
 --
 
-data Ctx = Ctx
-
 newtype ID = ID Int
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data BaseInfo = BaseInfo
   { ikaName :: Text
