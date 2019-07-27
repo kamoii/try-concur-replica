@@ -46,7 +46,7 @@ data MatchMember = MatchMember
   { memId :: ID
   , memBaseInfo :: BaseInfo
   , memMatchingCondition :: MatchingCondition
-  }
+  } deriving (Generic, Show)
 
 -- data MatchEvent
 --   = EVMemberStateChange MatchMember MatchMemberState

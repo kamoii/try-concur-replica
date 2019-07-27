@@ -32,7 +32,7 @@ welcome ctx =
   div []
     [ h1 [] [ t "ランダム・リグマ・マッチング" ]
     , p [] [ t "ランダムで、条件の近いイカとマッチングします。" ]
-    , displaySTM (getCurrentWaitingNum ctx) $ \i -> span [] [ t $ show i ]
+    , displaySTM (getWaitingNum ctx) $ \i -> span [] [ t $ show i ]
     , p [] [ t "参加します？" ]
     , () <$ button [onClick] [ t "参加する" ]
     ]
@@ -165,8 +165,19 @@ matching rs ctx mem cb = do
  * 退出ボタン(押しまちがいを防ぐ仕組みは必要かな)
 -}
 
-matchRoom :: _ => Ctx -> Match -> m ()
-matchRoom = undefined
+matchRoom :: _ => Ctx -> MatchMember -> Match -> m ()
+matchRoom ctx mem match = do
+  div []
+    [ h1 [] [ t "マッチしました!" ]
+    , div [] $ map displayMember $ mem ^. #members
+    , () <$ button [ onClick ] [ t "部屋を抜ける" ]
+    ]
+  where
+    displayMember mem = do
+      div []
+        [ h3 [] [ t $ mem ^. #memBaseInfo . #ikaName ]
+        , h5 [] [ t $ mem ^. #memBaseInfo . #ikaFriendCode ]
+        ]
 
 main :: IO ()
 main = do
@@ -179,7 +190,7 @@ main = do
     untilRight (initialBaseInfo,initialMc) \i' -> do
       i@(bi, mc) <- inputCondition i'
       let mem = MatchMember id bi mc
-      r <- matching rs ctx mem \room -> pure ()
+      r <- matching rs ctx mem $ matchRoom ctx mem
       case r of
         Left MFTimeout -> pure $ Left i
         Left MFCancel  -> pure $ Left i

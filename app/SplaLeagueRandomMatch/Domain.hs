@@ -7,7 +7,7 @@ module Domain
   , Ctx
   , mkCtx
   , genId
-  , getCurrentWaitingNum
+  , getWaitingNum
   , startMatching
   ) where
 
@@ -63,8 +63,8 @@ genId :: IO ID
 genId = ID <$> randomIO
 
 -- | 現在の待ち人数を取得する。
-getCurrentWaitingNum :: Ctx -> STM Int
-getCurrentWaitingNum ctx = pure 4
+getWaitingNum :: Ctx -> STM Int
+getWaitingNum Ctx{ctxQueue} = D.waitingNum <$> readTVar ctxQueue
 
 -- | マッチングに参加する
 --

@@ -6,6 +6,7 @@ module Domain.Matching
   ( MatchingError(..)
   , MatchingQueue
   , mkMatchingQueue
+  , waitingNum
   , addAndTryMatch
   , cancel
   ) where
@@ -32,6 +33,10 @@ data MatchingQueue id = MatchingQueue
 
 allIds :: Array RankTai [(id, MatchingCondition)] -> [id]
 allIds = map fst . foldl' (<>) []
+
+-- 現在待ちの人数。ただ 6 x |ランク帯| を超えることはないのででかくない
+waitingNum :: MatchingQueue a -> Int
+waitingNum MatchingQueue{mqQueue} = length $ allIds mqQueue
 
 mkMatchingQueue :: Ord id => MatchingQueue id
 mkMatchingQueue =
