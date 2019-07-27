@@ -57,14 +57,21 @@ welcome ctx =
 inputCondition :: _ => (BaseInfo, MatchingCondition) -> m (BaseInfo, MatchingCondition)
 inputCondition initial = do
   inputWithValidation validate initial \e i ->
-    div []
-      [ whenJust e \errs -> div [] (map t errs)
-      , Update <$> div []
-        [ zoom i (_1 . #ikaName) $ inputOnChange [ placeholder "四号" ]
-        , zoom i (_1 . #ikaFriendCode) $ inputOnChange [ placeholder "1234-5678-9012" ]
+    -- form [] . one $ fieldset []
+    fieldset []
+      [ legend [] [ t "条件入力" ]
+      , whenJust e \errs -> div [] (map t errs)
+      , Update <$> orr
+        [ label [] [ t "名前" ]
+        , zoom i (_1 . #ikaName) $ inputOnChange [ placeholder "例) ぼっち六号" ]
+        , label [] [ t "フレンドコード" ]
+        , zoom i (_1 . #ikaFriendCode) $ inputOnChange [ placeholder "例) 1234-5678-9012" ]
+        , label [] [ t "ランク帯" ]
         , zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
+        , label [] [ t "通話" ]
         , zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
-        , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "使用武器、意気込み等" ]
+        , label [] [ t "使用武器、意気込み等" ]
+        , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "例) 中射程シュター使いです!" ]
         ]
       , Done <$ button [ onClick ] [ t "探す!" ]
       ]
@@ -76,9 +83,9 @@ inputCondition initial = do
       RankAboveX2100 -> "X2100 <"
 
     rankRender rank radio = do
-      div []
-        [ t $ rankLabel rank
-        , radio []
+      label []
+        [ radio []
+        , t $ rankLabel rank
         ]
 
     tuuwaLabel = \case
@@ -87,7 +94,7 @@ inputCondition initial = do
       TuuwaEither -> "どちらでも良い"
 
     tuuwaRender tuuwa radio = do
-      div []
+      label []
         [ radio []
         , t $ tuuwaLabel tuuwa
         ]
@@ -181,21 +188,25 @@ matchRoom ctx mem match = do
 
 main :: IO ()
 main = do
-  let index = defaultIndex "#リグマ" mempty
+  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/awsm.css/dist/awsm.min.css")])]
+  let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/light.min.css")])]
+  let index = defaultIndex "#リグマ" header
   let wsopt = defaultConnectionOptions
   ctx <- mkCtx
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
     id <- liftIO $ genId
-    welcome ctx
-    untilRight (initialBaseInfo,initialMc) \i' -> do
-      i@(bi, mc) <- inputCondition i'
-      let mem = MatchMember id bi mc
-      r <- matching rs ctx mem $ matchRoom ctx mem
-      case r of
-        Left MFTimeout -> pure $ Left i
-        Left MFCancel  -> pure $ Left i
-        Right _        -> pure $ Left i
-
+    main_ []
+      [ do
+          welcome ctx
+          untilRight (initialBaseInfo,initialMc) \i' -> do
+            i@(bi, mc) <- inputCondition i'
+            let mem = MatchMember id bi mc
+            r <- matching rs ctx mem $ matchRoom ctx mem
+            case r of
+              Left MFTimeout -> pure $ Left i
+              Left MFCancel  -> pure $ Left i
+              Right _        -> pure $ Left i
+      ]
   where
     initialBaseInfo = BaseInfo
       { ikaName = ""

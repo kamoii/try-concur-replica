@@ -21,7 +21,7 @@ import Concur.Replica.Extended
 -- Most of the time you won't need `onInput`, `onChange` is enough.
 inputOnChange :: _ => [Props Text] -> Text -> m Text
 inputOnChange props txt =
-  input $ [ onChange <&> targetValue . target , value txt ] <> props
+  input $ [ type_ "text", onChange <&> targetValue . target , value txt ] <> props
 
 -- | Radio button
 
