@@ -37,10 +37,10 @@ data MatchingCondition = MatchingCondition
   , mcTuuwa :: Tuuwa
   } deriving (Generic, Show)
 
-data MatchMemberState
-  = MSPresent      -- ^ 在籍
-  | MSDisappeared  -- ^ 回線切れ
-  | MSExited       -- ^ 退出済み
+-- data MatchMemberState
+--   = MSPresent      -- ^ 在籍
+--   | MSDisappeared  -- ^ 回線切れ
+--   | MSExited       -- ^ 退出済み
 
 data MatchMember = MatchMember
   { memId :: ID
@@ -48,14 +48,14 @@ data MatchMember = MatchMember
   , memMatchingCondition :: MatchingCondition
   }
 
-data MatchEvent
-  = EVMemberStateChange MatchMember MatchMemberState
-  | EVMemberGreeting MatchMember
-  | EvComment MatchMember Text
+-- data MatchEvent
+--   = EVMemberStateChange MatchMember MatchMemberState
+--   | EVMemberGreeting MatchMember
+--   | EvComment MatchMember Text
 
 data Match = Match
-  { matchMatchMembers :: [(MatchMember, TVar MatchMemberState)]
-  , matchEvents :: TVar (Seq MatchEvent)
+  { matchMembers :: [MatchMember]
+  -- , matchEvents :: TVar (Seq MatchEvent)
   , matchRankTai :: RankTai
   , matchTuuwa :: Tuuwa
   }

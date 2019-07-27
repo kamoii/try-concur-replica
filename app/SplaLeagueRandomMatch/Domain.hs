@@ -81,11 +81,11 @@ startMatching Ctx{ctxQueue} mem = do
     tmvar <- newEmptyTMVar
     let a = Attach (mem, tmvar) (memId mem)
     ids' <- stateTVarM ctxQueue $ either throwSTM pure . D.addAndTryMatch (a, memMatchingCondition mem)
-    flip traverse_ ids' \ids -> do
-      let members' = map attachment ids
-      let room = undefined
+    flip traverse_ ids' \(ids',rankTai,tuuwa) -> do
+      let members' = map attachment ids'
+      let match = Match (map fst members') rankTai tuuwa
       -- ここでの TMVar はまだ空のはず
-      traverse_ (\(_,v) -> tryPutTMVar v room) members'
+      traverse_ (\(_,v) -> tryPutTMVar v match) members'
     pure (tmvar, a)
   let roomWait = atomically $ readTMVar tmvar
   let canceler = atomically $ modifyTVar' ctxQueue (D.cancel a)

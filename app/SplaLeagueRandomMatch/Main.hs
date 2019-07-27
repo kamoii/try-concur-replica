@@ -132,17 +132,17 @@ matching rs ctx mem cb = do
   -- TODO: ここで bracket パターンなのはここの責務じゃない気がしますね。
   let acq = startMatching ctx mem
   let rel = \(canceler, _) -> canceler
-  E.pbracket rs acq rel $ \(_, roomWait) -> do
+  E.pbracket rs acq rel $ \(_, matchWait) -> do
       r <- orr
-        [ Right <$> liftIO roomWait
+        [ Right <$> liftIO matchWait
         , Left <$> div []
           [ MFTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
           , MFCancel <$ button [ onClick ] [ t "cancel" ]
           ]
         ]
       case r of
-        Left err   -> pure $ Left err
-        Right room -> Right <$> cb room
+        Left err    -> pure $ Left err
+        Right match -> Right <$> cb match
   where
 
     -- | カウントダウン

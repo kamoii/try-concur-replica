@@ -42,14 +42,16 @@ addAndTryMatch
   :: Ord id
   => (id, MatchingCondition)
   -> MatchingQueue id
-  -> Either MatchingError (Maybe [id], MatchingQueue id)
+  -> Either MatchingError (Maybe ([id], RankTai, Tuuwa), MatchingQueue id)
 addAndTryMatch v@(id, cond) MatchingQueue{mqQueue} = do
   when (elem id (allIds mqQueue)) $ Left AlreadyInTheQueue
   let rankTai  = mcRankTai cond
   let que      = (mqQueue ! rankTai) <> [v]
   pure $ case simpleMatching que of
-    Just (matches, leftovers) -> (Just matches, MatchingQueue (mqQueue // [(rankTai,leftovers)]))
-    Nothing                   -> (Nothing, MatchingQueue (mqQueue // [(rankTai,que)]))
+    Nothing ->
+      (Nothing, MatchingQueue (mqQueue // [(rankTai,que)]))
+    Just ((ids,tuuwa), leftovers) ->
+      (Just (ids,rankTai,tuuwa), MatchingQueue (mqQueue // [(rankTai,leftovers)]))
 
 cancel :: Ord id => id -> MatchingQueue id -> MatchingQueue id
 cancel id MatchingQueue{mqQueue} =
@@ -78,14 +80,14 @@ cancel id MatchingQueue{mqQueue} =
 simpleMatching
   :: forall  id. Eq id
   => [(id, MatchingCondition)]
-  -> Maybe ([id], [(id, MatchingCondition)])
+  -> Maybe (([id], Tuuwa), [(id, MatchingCondition)])
 simpleMatching ms
   | length ms < 4 = Nothing
   | otherwise = do
       chosen <- chosen'
       let ids = map (view $ _2 . _1) chosen
       let others = filter (\i -> not $ elem (fst i) ids) seven
-      pure (ids, others <> tails)
+      pure ((ids, tuuwaType chosen), others <> tails)
   where
     seven  = take 7 ms
     tuuwaL = _2 . _2 . #mcTuuwa
@@ -97,3 +99,9 @@ simpleMatching ms
       | length ari == 4 && length nashi == 4 = Just if map fst ari < map fst nashi then ari else nashi
       | otherwise = Nothing
     tails  = drop 7 ms
+    tuuwaType = go TuuwaEither
+      where
+        go t [] = t
+        go t (x:xs)
+          | x ^. tuuwaL == TuuwaEither && t /= TuuwaEither = go t xs
+          | otherwise = go (x ^. tuuwaL) xs
