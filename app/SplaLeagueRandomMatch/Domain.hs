@@ -6,6 +6,7 @@ module Domain
   ( module Domain.Types
   , Ctx
   , mkCtx
+  , genId
   , getCurrentWaitingNum
   , startMatching
   ) where
@@ -16,10 +17,10 @@ import Data.V.Core as V
 import Data.V.Text as V
 import qualified Relude.Extra.Enum as BEnum
 --
-import qualified Data.Text              as T
-import           Text.Read              (readMaybe)
-import           Control.Concurrent.STM (retry, check)
+import           Control.Concurrent.STM (throwSTM)
+import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent     (threadDelay)
+import           System.Random (randomIO)
 
 import Domain.Types
 import qualified Domain.Matching as D
@@ -39,14 +40,27 @@ Context が自分が死ぬ時に自分の後片付けを行なう。多分効率
 抜けはなさそうだけど効率は悪いかな(thread は前Context の生存状態を監視する必要あり)
 -}
 
+data Attach a v = Attach a v
+
+attachment (Attach a _) = a
+
+instance Eq v => Eq (Attach a v) where
+  Attach _ v0 == Attach _ v1 = v0 == v1
+
+instance Ord v => Ord (Attach a v) where
+  Attach _ v0 <= Attach _ v1 = v0 <= v1
+
 data Ctx = Ctx
-  { ctxQueue :: TVar (D.MatchingQueue ID)
+  { ctxQueue :: TVar (D.MatchingQueue (Attach ((ID,BaseInfo,MatchingCondition),TMVar Match) ID))
   }
 
 mkCtx :: IO Ctx
 mkCtx = do
   q <- newTVarIO D.mkMatchingQueue
   pure $ Ctx q
+
+genId :: IO ID
+genId = ID <$> randomIO
 
 -- | 現在の待ち人数を取得する。
 getCurrentWaitingNum :: Ctx -> STM Int
@@ -61,10 +75,27 @@ getCurrentWaitingNum ctx = pure 4
 -- 二番目の `IO Match` はマッチングするまでブロックする。マッチすると Match が返る。
 --
 -- TODO: canceler というか detacher ? のほうがいいかもな
-startMatching :: Ctx -> IO (IO (), IO Match)
-startMatching ctx = do
-  pure (pure (), ioBlock)
-
+startMatching :: Ctx -> (ID, BaseInfo, MatchingCondition) -> IO (IO (), IO Match)
+startMatching Ctx{ctxQueue} v@(id, bi, mc) = do
+  (tmvar, a) <- atomically $ do
+    tmvar <- newEmptyTMVar
+    let a = Attach (v, tmvar) id
+    ids' <- stateTVarM ctxQueue $ either throwSTM pure . D.addAndTryMatch (a, mc)
+    flip traverse_ ids' \ids -> do
+      let members = map attachment ids
+      let room = undefined
+      -- ここでの TMVar はまだ空のはず
+      traverse_ (\(_,v) -> tryPutTMVar v room) members
+    pure (tmvar, a)
+  let roomWait = atomically $ readTMVar tmvar
+  let canceler = atomically $ modifyTVar' ctxQueue (D.cancel a)
+  pure (canceler, roomWait)
+  where
+    stateTVarM :: TVar s -> (s -> STM (a, s)) -> STM a
+    stateTVarM var f = do
+      (a, s') <- f =<< readTVar var
+      writeTVar var s'
+      pure a
 
 -- for test/development
 ioBlock :: IO a

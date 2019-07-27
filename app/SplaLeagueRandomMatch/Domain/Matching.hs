@@ -40,16 +40,16 @@ mkMatchingQueue =
 -- 既に同一idで登録している場合は例外を投げる
 addAndTryMatch
   :: Ord id
-  => MatchingQueue id
-  -> (id, MatchingCondition)
-  -> Either MatchingError (MatchingQueue id, Maybe [(id, MatchingCondition)])
-addAndTryMatch MatchingQueue{mqQueue} v@(id, cond) = do
+  => (id, MatchingCondition)
+  -> MatchingQueue id
+  -> Either MatchingError (Maybe [id], MatchingQueue id)
+addAndTryMatch v@(id, cond) MatchingQueue{mqQueue} = do
   when (elem id (allIds mqQueue)) $ Left AlreadyInTheQueue
   let rankTai  = mcRankTai cond
   let que      = (mqQueue ! rankTai) <> [v]
   pure $ case simpleMatching que of
-    Just (matches, leftovers) -> (MatchingQueue (mqQueue // [(rankTai,leftovers)]), Just matches)
-    Nothing                   -> (MatchingQueue (mqQueue // [(rankTai,que)]), Nothing)
+    Just (matches, leftovers) -> (Just matches, MatchingQueue (mqQueue // [(rankTai,leftovers)]))
+    Nothing                   -> (Nothing, MatchingQueue (mqQueue // [(rankTai,que)]))
 
 cancel :: Ord id => id -> MatchingQueue id -> MatchingQueue id
 cancel id MatchingQueue{mqQueue} =
@@ -78,14 +78,14 @@ cancel id MatchingQueue{mqQueue} =
 simpleMatching
   :: forall  id. Eq id
   => [(id, MatchingCondition)]
-  -> Maybe ([(id, MatchingCondition)], [(id, MatchingCondition)])
+  -> Maybe ([id], [(id, MatchingCondition)])
 simpleMatching ms
   | length ms < 4 = Nothing
   | otherwise = do
       chosen <- chosen'
       let ids = map (view $ _2 . _1) chosen
       let others = filter (\i -> not $ elem (fst i) ids) seven
-      pure (map snd chosen, others <> tails)
+      pure (ids, others <> tails)
   where
     seven  = take 7 ms
     tuuwaL = _2 . _2 . #mcTuuwa

@@ -34,7 +34,7 @@ welcome ctx =
     , p [] [ t "ランダムで、条件の近いイカとマッチングします。" ]
     , displaySTM (getCurrentWaitingNum ctx) $ \i -> span [] [ t $ show i ]
     , p [] [ t "参加します？" ]
-    , button [() <$ onClick] [ t "参加する" ]
+    , () <$ button [onClick] [ t "参加する" ]
     ]
 
 
@@ -125,12 +125,12 @@ matching
   :: _
   => E.ReleaseStack
   -> Ctx
-  -> (BaseInfo, MatchingCondition)
+  -> (ID, MatchingCondition)
   -> (Match -> m r)
   -> m (Either MatchingFailed r)
-matching rs ctx ika cb = do
+matching rs ctx idmc cb = do
   -- TODO: ここで bracket パターンなのはここの責務じゃない気がしますね。
-  let acq = startMatching ctx
+  let acq = startMatching ctx idmc
   let rel = \(canceler, _) -> canceler
   E.pbracket rs acq rel $ \(_, roomWait) -> do
       r <- orr
@@ -155,18 +155,18 @@ matching rs ctx ika cb = do
         _ <- liftIO (threadDelay (1 * 1000 * 1000)) <|> f i
         countdown (i-1) f
 
-{-| リーグ画面
+{-| match画面
 
-現状は即座に部屋に入るでいい気がするな。不満があれば
+現状は即座に部屋に入るでいい気がするな。不満があれば変える。
 
  * 他の人の状態
  * 他の人のフレコ、部屋立ての人を決定
- * チャット
+ * +チャット+ -> discord
  * 退出ボタン(押しまちがいを防ぐ仕組みは必要かな)
 -}
 
-league :: _ => Ctx -> Match -> m ()
-league = undefined
+matchRoom :: _ => Ctx -> Match -> m ()
+matchRoom = undefined
 
 main :: IO ()
 main = do
@@ -174,10 +174,11 @@ main = do
   let wsopt = defaultConnectionOptions
   ctx <- mkCtx
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
+    id <- liftIO $ genId
     welcome ctx
     untilRight (initialBaseInfo,initialMc) \i' -> do
-      i <- inputCondition i'
-      r <- matching rs ctx i \room -> pure ()
+      i@(bi, mc) <- inputCondition i'
+      r <- matching rs ctx (id,mc) \room -> pure ()
       case r of
         Left MFTimeout -> pure $ Left i
         Left MFCancel  -> pure $ Left i
