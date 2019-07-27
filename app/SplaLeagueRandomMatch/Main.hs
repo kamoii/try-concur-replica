@@ -125,12 +125,12 @@ matching
   :: _
   => E.ReleaseStack
   -> Ctx
-  -> (ID, MatchingCondition)
+  -> MatchMember
   -> (Match -> m r)
   -> m (Either MatchingFailed r)
-matching rs ctx idmc cb = do
+matching rs ctx mem cb = do
   -- TODO: ここで bracket パターンなのはここの責務じゃない気がしますね。
-  let acq = startMatching ctx idmc
+  let acq = startMatching ctx mem
   let rel = \(canceler, _) -> canceler
   E.pbracket rs acq rel $ \(_, roomWait) -> do
       r <- orr
@@ -178,7 +178,8 @@ main = do
     welcome ctx
     untilRight (initialBaseInfo,initialMc) \i' -> do
       i@(bi, mc) <- inputCondition i'
-      r <- matching rs ctx (id,mc) \room -> pure ()
+      let mem = MatchMember id bi mc
+      r <- matching rs ctx mem \room -> pure ()
       case r of
         Left MFTimeout -> pure $ Left i
         Left MFCancel  -> pure $ Left i

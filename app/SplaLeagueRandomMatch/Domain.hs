@@ -51,7 +51,7 @@ instance Ord v => Ord (Attach a v) where
   Attach _ v0 <= Attach _ v1 = v0 <= v1
 
 data Ctx = Ctx
-  { ctxQueue :: TVar (D.MatchingQueue (Attach ((ID,BaseInfo,MatchingCondition),TMVar Match) ID))
+  { ctxQueue :: TVar (D.MatchingQueue (Attach (MatchMember,TMVar Match) ID))
   }
 
 mkCtx :: IO Ctx
@@ -75,17 +75,17 @@ getCurrentWaitingNum ctx = pure 4
 -- 二番目の `IO Match` はマッチングするまでブロックする。マッチすると Match が返る。
 --
 -- TODO: canceler というか detacher ? のほうがいいかもな
-startMatching :: Ctx -> (ID, BaseInfo, MatchingCondition) -> IO (IO (), IO Match)
-startMatching Ctx{ctxQueue} v@(id, bi, mc) = do
+startMatching :: Ctx -> MatchMember -> IO (IO (), IO Match)
+startMatching Ctx{ctxQueue} mem = do
   (tmvar, a) <- atomically $ do
     tmvar <- newEmptyTMVar
-    let a = Attach (v, tmvar) id
-    ids' <- stateTVarM ctxQueue $ either throwSTM pure . D.addAndTryMatch (a, mc)
+    let a = Attach (mem, tmvar) (memId mem)
+    ids' <- stateTVarM ctxQueue $ either throwSTM pure . D.addAndTryMatch (a, memMatchingCondition mem)
     flip traverse_ ids' \ids -> do
-      let members = map attachment ids
+      let members' = map attachment ids
       let room = undefined
       -- ここでの TMVar はまだ空のはず
-      traverse_ (\(_,v) -> tryPutTMVar v room) members
+      traverse_ (\(_,v) -> tryPutTMVar v room) members'
     pure (tmvar, a)
   let roomWait = atomically $ readTMVar tmvar
   let canceler = atomically $ modifyTVar' ctxQueue (D.cancel a)
