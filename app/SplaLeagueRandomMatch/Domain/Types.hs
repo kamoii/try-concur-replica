@@ -58,4 +58,4 @@ data Match = Match
   -- , matchEvents :: TVar (Seq MatchEvent)
   , matchRankTai :: RankTai
   , matchTuuwa :: Tuuwa
-  }
+  } deriving Generic

@@ -169,7 +169,7 @@ matchRoom :: _ => Ctx -> MatchMember -> Match -> m ()
 matchRoom ctx mem match = do
   div []
     [ h1 [] [ t "マッチしました!" ]
-    , div [] $ map displayMember $ mem ^. #members
+    , div [] $ map displayMember $ match ^. #matchMembers
     , () <$ button [ onClick ] [ t "部屋を抜ける" ]
     ]
   where
