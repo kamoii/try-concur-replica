@@ -67,23 +67,23 @@ inputCondition initial = do
         , label [] [ t "フレンドコード" ]
         , zoom i (_1 . #ikaFriendCode) $ inputOnChange [ placeholder "例) 1234-5678-9012" ]
         , label [] [ t "ランク帯" ]
-        , zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
+        , paddingLeft "1rem" $ zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
         , label [] [ t "通話" ]
-        , zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
+        , paddingLeft "1rem" $ zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
         , label [] [ t "使用武器、意気込み等" ]
-        , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "例) 中射程シュター使いです!" ]
+        , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
         ]
       , Done <$ button [ onClick ] [ t "探す!" ]
       ]
   where
     rankLabel = \case
-      RankCtoB       -> "C- ~ B+"
-      RankAtoS       -> "A- ~ S"
-      RankSpToX2100  -> "S+ ~ X2100"
-      RankAboveX2100 -> "X2100 <"
+      RankCtoB       -> "C- ～ B+"
+      RankAtoS       -> "A- ～ S"
+      RankSpToX2100  -> "S+ ～ X2100"
+      RankAboveX2100 -> "X2100以上"
 
     rankRender rank radio = do
-      label []
+      div [] . one $ label []
         [ radio []
         , t $ rankLabel rank
         ]
@@ -94,7 +94,7 @@ inputCondition initial = do
       TuuwaEither -> "どちらでも良い"
 
     tuuwaRender tuuwa radio = do
-      label []
+      div [] . one $ label []
         [ radio []
         , t $ tuuwaLabel tuuwa
         ]
@@ -114,6 +114,9 @@ inputCondition initial = do
         mc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
         v    = (,) <$> lmap fst bi <*> lmap snd mc
       in pure . applyV v
+
+    paddingLeft i =
+      div [ style [("padding-left", i)] ] . one
 
 {-| マッチング待機画面
 
@@ -188,24 +191,34 @@ matchRoom ctx mem match = do
 
 main :: IO ()
 main = do
-  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/awsm.css/dist/awsm.min.css")])]
-  let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/light.min.css")])]
-  let index = defaultIndex "#リグマ" header
+  let header' = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/awsm.css/dist/awsm.min.css")])]
+  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/wingcss")])]
+  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/light.min.css")])]
+  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/picnic")])]
+  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css")])]
+  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/chota@latest")])]
+  -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/marx-css/css/marx.min.css")])]
+  let index = defaultIndex "#リグマ" header'
   let wsopt = defaultConnectionOptions
   ctx <- mkCtx
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
     id <- liftIO $ genId
-    main_ []
-      [ do
-          welcome ctx
-          untilRight (initialBaseInfo,initialMc) \i' -> do
-            i@(bi, mc) <- inputCondition i'
-            let mem = MatchMember id bi mc
-            r <- matching rs ctx mem $ matchRoom ctx mem
-            case r of
-              Left MFTimeout -> pure $ Left i
-              Left MFCancel  -> pure $ Left i
-              Right _        -> pure $ Left i
+    orr
+      [ header [] [ h3 [] [ t "#リグマ" ] ]
+      , main_ []
+        [ do
+            welcome ctx
+            untilRight (initialBaseInfo,initialMc) \i' -> do
+              i@(bi, mc) <- inputCondition i'
+              let mem = MatchMember id bi mc
+              r <- matching rs ctx mem $ matchRoom ctx mem
+              case r of
+                Left MFTimeout -> pure $ Left i
+                Left MFCancel  -> pure $ Left i
+                Right _        -> pure $ Left i
+        ]
+      , footer []
+        [ t "@kamoii" ]
       ]
   where
     initialBaseInfo = BaseInfo
