@@ -138,6 +138,8 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - try-concur-replica
+    - random
+    - discord-haskell
 
 tests:
   try-concur-replica-test:

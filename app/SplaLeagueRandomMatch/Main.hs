@@ -27,13 +27,35 @@ import           Concur.Replica.Widget.Input
 --
 import Domain
 
+{-
+良く考えたら randomって入れる必要ないな。
+どっちかというと「条件が合う人が集まるまで待つ」、だ
+
++スプラトゥーン2のリグマをやりたい奴が集ってランダムにマッチするサービスです。+
+
+
+リグマやりたいのにイカ友達がいない・集まらない
+twitter で見知らぬイカに声かけるのは抵抗がある
+ガチマに疲れた
+
+では、入力画面にgo-
+
+現在β(ベータ)版です。
+!ない機能
+
+ログイン機能
+チャット・音声通話機能(discordを利用)
+スマフォでの動作保証ない。PCで見てね
+-}
+
 welcome :: _ => Ctx -> m ()
 welcome ctx =
   div []
-    [ h1 [] [ t "ランダム・リグマ・マッチング" ]
-    , p [] [ t "ランダムで、条件の近いイカとマッチングします。" ]
-    , displaySTM (getWaitingNum ctx) $ \i -> span [] [ t $ show i ]
-    , p [] [ t "参加します？" ]
+    [ h1 [] [ t "#リグマ部屋(beta)" ]
+    -- このサービスを一言で
+    , p [] [ t "スプラトゥーン2でリーグマッチ(通称「リグマ」)の仲間と" ]
+    , p [] [ t "条件(ランク帯、通話の有無)を入力してマッチング!" ]
+    -- , displaySTM (getWaitingNum ctx) $ \i -> span [] [ t $ show i ]
     , () <$ button [onClick] [ t "参加する" ]
     ]
 
@@ -58,9 +80,9 @@ inputCondition :: _ => (BaseInfo, MatchingCondition) -> m (BaseInfo, MatchingCon
 inputCondition initial = do
   inputWithValidation validate initial \e i ->
     -- form [] . one $ fieldset []
-    fieldset []
+    orr
+    [ fieldset []
       [ legend [] [ t "条件入力" ]
-      , whenJust e \errs -> div [] (map t errs)
       , Update <$> orr
         [ label [] [ t "名前" ]
         , zoom i (_1 . #ikaName) $ inputOnChange [ placeholder "例) ぼっち六号" ]
@@ -73,8 +95,10 @@ inputCondition initial = do
         , label [] [ t "使用武器、意気込み等" ]
         , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
         ]
-      , Done <$ button [ onClick ] [ t "探す!" ]
       ]
+    , Done <$ button [ onClick, style [("display", "block"), ("width", "100%"), ("margin", "1rem auto 0 auto")] ] [ t "探す!" ]
+    , whenJust e \errs -> ul [] (map (li [] . one . span [style [("color", "red")]] . one . t) errs)
+    ]
   where
     rankLabel = \case
       RankCtoB       -> "C- ～ B+"
@@ -108,8 +132,8 @@ inputCondition initial = do
       let
         lessThan' name len = lessThan len !> [ name <> "は" <> show len <> "文字以内に入力してください" ]
         name = to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
-        code = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "形式が違います" ]
-        note = to T.strip >>> lessThan' "意気込み等" maxNoteLength
+        code = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "フレンドコードの形式が違います" ]
+        note = to T.strip >>> lessThan' "使用武器、意気込み等" maxNoteLength
         bi   = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
         mc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
         v    = (,) <$> lmap fst bi <*> lmap snd mc
@@ -204,7 +228,7 @@ main = do
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
     id <- liftIO $ genId
     orr
-      [ header [] [ h3 [] [ t "#リグマ" ] ]
+      [ header [] [ h3 [] [ t "#リグマ部屋(β)" ] ]
       , main_ []
         [ do
             welcome ctx
