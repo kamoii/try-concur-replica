@@ -1,3 +1,5 @@
 .stack-work/
 try-concur-replica.cabal
 *~
+
+/discord.token
