@@ -32,6 +32,7 @@ packages:
 - .
 - /home/sino/mygithub/concur-replica
 - /home/sino/mygithub/replica
+- /home/sino/mygithub/discord-haskell
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as
 # forks / in-progress versions pinned to a git hash. For example:
@@ -46,8 +47,8 @@ extra-deps:
   commit: 6c6bcc07b2688182945b28f154a013eee3f624c5
   subdirs:
     - concur-core
-- discord-haskell-1.0.0
 - emoji-0.1.0.2@sha256:d995572a5c7dcd28f98eb15c6e387a7b3bda1ac2477ab0d9dba8580d5d7b161f,1273
+# - discord-haskell-1.0.0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

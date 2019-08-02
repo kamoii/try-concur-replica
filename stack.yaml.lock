@@ -21,13 +21,6 @@ packages:
     git: https://github.com/pkamenarsky/concur.git
     commit: 6c6bcc07b2688182945b28f154a013eee3f624c5
 - completed:
-    hackage: discord-haskell-1.0.0@sha256:91b4a0839c1c994eec1c77ffd0ecab387a3e46db3caf4bc949c7853bbd7fc0b7,3683
-    pantry-tree:
-      size: 1957
-      sha256: 2541b6b62de9f64f55f88af661d7b3e2d8fd514fd4bf9730c60836a470aed180
-  original:
-    hackage: discord-haskell-1.0.0
-- completed:
     hackage: emoji-0.1.0.2@sha256:d995572a5c7dcd28f98eb15c6e387a7b3bda1ac2477ab0d9dba8580d5d7b161f,1273
     pantry-tree:
       size: 437

@@ -139,6 +139,8 @@ executables:
     dependencies:
     - try-concur-replica
     - random
+    - async
+    - pretty-simple
     - discord-haskell
 
 tests:
