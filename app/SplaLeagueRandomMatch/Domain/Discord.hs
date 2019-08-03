@@ -1,7 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE BlockArguments #-}
-module Domain.Discord where
+module Domain.Discord
+  ( LigumaDiscord
+  , initialize
+  , lookupMember
+  , mkChannels
+  -- re-exports
+  , UserId
+  ) where
 
 import P hiding (isPrefixOf)
 import Control.Lens
@@ -17,6 +24,10 @@ import Control.Concurrent.Async
 import Control.Concurrent.STM (throwSTM)
 import Control.Concurrent.STM.TMVar
 import Text.Pretty.Simple
+import Data.Time.Clock.POSIX (getPOSIXTime)
+import Data.UUID (UUID)
+import qualified Data.UUID as UUID
+import qualified Data.UUID.V1 as UUID
 
 import Discord
 import Discord.Types
@@ -50,39 +61,37 @@ instance Exception DiscordError
 
 -}
 data LigumaDiscord = LigumaDiscord
-  { ldGuildId :: GuildId
-  , ldRoleEveryone :: Role
-  , ldMembers :: IORef (Map UserId GuildMember)
+  { ldHandle           :: DiscordHandle
+  , ldGuildId          :: GuildId
+  , ldRoleEveryone     :: Role
+  , ldMembers          :: IO (Map UserId GuildMember)
   , ldLigumaCategoryId :: ChannelId
-  , ldLigumaChannels :: IORef (Map ChannelId Channel)
-  , ldAsyncMain :: Async Text
-  , ldAsyncEvent :: Async Void
+  , ldLigumaChannels   :: IO (Map ChannelId Channel)
+  , ldAsyncMain        :: Async Text
+  , ldAsyncEvent       :: Async Void
   } deriving Generic
 
 initialize :: IO LigumaDiscord
 initialize = do
-  tok              <- readDiscordToken
-  evMvar           <- newEmptyMVar
+  tok <- readDiscordToken
+  evMvar <- newEmptyMVar
   (dis, asyncMain) <- startDiscord tok \_ ev -> putMVar evMvar ev
   gid <- do
     pg' <- restCall' dis R.GetCurrentUserGuilds
     pg  <- onlyOne pg' & throwNothing (DiscordError "予期せぬギルドに所属")
-    when (partialGuildName pg /= "リグマ部屋")
-      $ throwIO (DiscordError "予期せぬギルドに所属")
+    when (partialGuildName pg /= "リグマ部屋") $ throwIO (DiscordError "予期せぬギルドに所属")
     pure $ partialGuildId pg
   (ligumaCategoryId, channelsRef) <- do
     cs <- restCall' dis $ R.GetGuildChannels gid
     let cats = catMaybes $ map (preview #_ChannelGuildCategory) cs
-    lcatId <- view _1 <$> find ((=="リグマ") . view _3) cats
-      & throwNothing (DiscordError "「リグマ」カテゴリが見つかりせんでした")
+    lcatId <- view _1 <$> find ((=="リグマ") . view _3) cats & throwNothing (DiscordError "「リグマ」カテゴリが見つかりせんでした")
     let ligumaChans = filter (belongsToCat lcatId) cs
     var <- newIORef mempty
     modifyIORef' var $ M.union $ M.fromList $ map (\c -> (channelId c, c)) ligumaChans
     pure $ (lcatId, var)
   roleEveryone <- do
     rs <- restCall' dis $ R.GetGuildRoles gid
-    find ((=="@everyone") . roleName) rs
-      & throwNothing (DiscordError "No @everyone role")
+    find ((=="@everyone") . roleName) rs & throwNothing (DiscordError "No @everyone role")
   membersRef <- do
     ms  <- listGuildMembersAll dis gid
     var <- newIORef mempty
@@ -93,11 +102,12 @@ initialize = do
     $ takeMVar evMvar >>= onEvent gid ligumaCategoryId membersRef channelsRef
   link2 asyncMain asyncEvent
   pure $ LigumaDiscord
-    { ldGuildId = gid
+    { ldHandle = dis
+    , ldGuildId = gid
     , ldRoleEveryone = roleEveryone
-    , ldMembers = membersRef
+    , ldMembers = readIORef membersRef            -- ^ ref を更新するのは eventハンドラだけ
     , ldLigumaCategoryId = ligumaCategoryId
-    , ldLigumaChannels = channelsRef
+    , ldLigumaChannels = readIORef channelsRef    -- ^ ref を更新するのは eventハンドラだけ
     , ldAsyncMain = asyncMain
     , ldAsyncEvent = asyncEvent
     }
@@ -131,7 +141,72 @@ initialize = do
           | gid == guildId         -> pPrint mems *> pure () -- ??
         _ -> pure ()
 
+-- | username + '#' + descriminator から メンバーの UserId を取得する
+lookupMember :: LigumaDiscord -> Text -> IO (Maybe UserId)
+lookupMember LigumaDiscord{ldMembers} ud = do
+  users <- map memberUser . M.elems <$> ldMembers
+  pure $ userId <$> find (\u -> userName u <> "#" <> userDiscrim u == ud) users
 
+-- | テキストチャンネルの作成
+-- | 名前は一意的なものが勝手に振られる。
+-- | 招待用のURLが返される
+-- |
+mkChannels
+  :: LigumaDiscord
+  -> [UserId]
+  -> Text                -- ^ 名前(一意性の保証不要、だがあった方がいい)
+  -> Text                -- ^ テキストチャンネルの冒頭の挨拶
+  -> Bool                -- ^ 音声もありか
+  -> IO Text             -- ^ テキストチャンネルのURL
+mkChannels LigumaDiscord{ .. } users name greeting voiceToo = do
+  members <- ldMembers
+  mems <- traverse (\uid -> members ^. at uid) users
+    & throwNothing (DiscordError "この中にギルド脱退者が居る")
+  now <- getPOSIXTime
+  let topic = show now
+  let overwrite
+        = mkRoleOverwrite 0 allPermissions ldRoleEveryone
+        : map (mkMemberOverwrite userAllowPermissions 0) mems
+  ch <- restCall' ldHandle $ R.CreateGuildChannel ldGuildId name overwrite (txtOpts topic ldLigumaCategoryId)
+  _  <- when voiceToo $ void $ restCall' ldHandle
+                          $ R.CreateGuildChannel ldGuildId name overwrite (voiceOpts ldLigumaCategoryId)
+  _  <- restCall' ldHandle $ R.CreateMessage (channelId ch) greeting
+  -- iv <- restCall' ldHandle $ R.CreateChannelInvite (channelId ch) ivOpts
+  pure $ textChannelUrl ch
+  where
+    txtOpts topic catId = R.CreateGuildChannelOptsText
+      { createGuildChannelOptsTopic = Just topic
+      , createGuildChannelOptsUserMessageRateDelay = Nothing
+      , createGuildChannelOptsIsNSFW = Nothing
+      , createGuildChannelOptsCategoryId = Just catId
+      }
+
+    voiceOpts catId = R.CreateGuildChannelOptsVoice
+      { createGuildChannelOptsBitrate = Nothing
+      , createGuildChannelOptsMaxUsers = Nothing
+      , createGuildChannelOptsCategoryId = Just catId
+      }
+
+    -- 招待は 30分だけ有効とする
+    ivOpts = R.ChannelInviteOpts
+      { channelInviteOptsMaxAgeSeconds = Just (30 * 60)
+      , channelInviteOptsMaxUsages = Nothing
+      , channelInviteOptsIsTemporary = Nothing
+      , channelInviteOptsDontReuseSimilarInvite = Nothing
+      }
+
+textChannelUrl :: Channel -> Text
+textChannelUrl ch =
+  "https://discordapp.com/channels/"
+  <> show (channelGuild ch)
+  <> "/"
+  <> show (channelId ch)
+
+inviteUrl :: Invite -> Text
+inviteUrl Invite{inviteCode} = "https://discord.gg/" <> inviteCode
+
+tillJust :: Monad m => m (Maybe a) -> m a
+tillJust m = m >>= maybe (tillJust m) pure
 
 -- pPrint ms
 -- let topic = "test\nです"
@@ -185,9 +260,6 @@ createLimitedTextChannel dis gid name members = do
 -- |   * 動的に作成するチャネルは、@everyone に対して全不許可にし、
 -- |     特定のメンバーだけ必要な権限のみ allow する
 -- |
--- | 2019/08/03
--- | カテゴリの権限について理解が誤っているようだ
-
 
 -- 2019/08/03時点で guild を作成したときに付いている権限
 -- https://discordapi.com/permissions.html#37215296

@@ -141,6 +141,8 @@ executables:
     - random
     - async
     - pretty-simple
+    - time
+    - uuid
     - discord-haskell
 
 tests:
