@@ -5,10 +5,12 @@ module Domain.Discord where
 
 import P hiding (isPrefixOf)
 import Control.Lens
+import Control.Lens.Extras (is)
 import Data.Generics.Labels
 import Control.Exception (throwIO)
 import Control.Monad (when)
 import Data.Text (isPrefixOf, toLower, Text)
+import qualified Data.Map as M
 import qualified Data.Text as T
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
@@ -50,48 +52,83 @@ instance Exception DiscordError
 data LigumaDiscord = LigumaDiscord
   { ldGuildId :: GuildId
   , ldRoleEveryone :: Role
-  , ldMembers :: IORef [GuildMember]
+  , ldMembers :: IORef (Map UserId GuildMember)
   , ldLigumaCategoryId :: ChannelId
-  , ldLigumaChannels :: IORef [Channel]
+  , ldLigumaChannels :: IORef (Map ChannelId Channel)
+  , ldAsyncMain :: Async Text
+  , ldAsyncEvent :: Async Void
   } deriving Generic
 
+initialize :: IO LigumaDiscord
 initialize = do
-  tok <- readDiscordToken
-  dis <- startDiscord tok (\_ _ -> pure ())
-  -- 現状一つのギルドのみに所属しているはず
-  [pguild] <- restCall' dis $ R.GetCurrentUserGuilds
-  when (partialGuildName pguild /= "リグマ部屋") $ throwIO (DiscordError "Unexpected guild")
-  let gid = partialGuildId pguild
-  -- ギルド「リグマ部屋」の全てのチャネルを取得(カテゴリも含まれている)
-  chans <- restCall' dis $ R.GetGuildChannels gid
-  pPrint chans
-  let ligumaCat' = chans
-        & map (preview #_ChannelGuildCategory)
-        & catMaybes
-        & filter ((=="リグマ") . view _3)
-  ligumaCatId <- case ligumaCat' of
-    [(catId, _, _)] -> pure catId
-    _ -> throwIO $ DiscordError "「リグマ」カテゴリが見つかりせんでした"
-  -- 全roles
-  roles <- restCall' dis $ R.GetGuildRoles gid
-  roleEveryone <- find ((=="@everyone") . roleName) roles & throwNothing (DiscordError "No @everyone role")
-  -- 全ギルドメンバー
-  ms <- listGuildMembersAll dis gid
-  -- pPrint ms
-  -- let topic = "test\nです"
-  -- let name = "c1345223"
-  -- let overwrite
-  --       = mkRoleOverwrite 0 allPermissions roleEveryone
-  --       : map (mkMemberOverwrite userAllowPermissions 0) ms
-  -- let opts = R.CreateGuildChannelOptsText
-  --       { createGuildChannelOptsTopic = Just topic
-  --       , createGuildChannelOptsUserMessageRateDelay = Nothing
-  --       , createGuildChannelOptsIsNSFW = Nothing
-  --       , createGuildChannelOptsCategoryId = Just ligumaCatId
-  --       }
-  -- throwLeft =<< restCall dis (R.CreateGuildChannel gid name overwrite opts)
-  pure ()
+  tok              <- readDiscordToken
+  evMvar           <- newEmptyMVar
+  (dis, asyncMain) <- startDiscord tok \_ ev -> putMVar evMvar ev
+  pguild'          <- restCall' dis R.GetCurrentUserGuilds
+  pguild           <- onlyOne pguild' & throwNothing (DiscordError "予期せぬギルドに所属")
+  when (partialGuildName pguild /= "リグマ部屋") $ throwIO (DiscordError "予期せぬギルドに所属")
+  let gid          = partialGuildId pguild
+  chans            <- restCall' dis $ R.GetGuildChannels gid
+  let cats         = chans & map (preview #_ChannelGuildCategory) & catMaybes
+  ligumaCategoryId <- view _1 <$> find ((=="リグマ") . view _3) cats & throwNothing (DiscordError "「リグマ」カテゴリが見つかりせんでした")
+  let ligumaChans  = chans & filter (belongsToCat ligumaCategoryId)
+  channelsRef      <- newIORef mempty
+  modifyIORef' channelsRef $ M.union $ M.fromList $ map (\c -> (channelId c, c)) ligumaChans
+  roles            <- restCall' dis $ R.GetGuildRoles gid
+  roleEveryone     <- find ((=="@everyone") . roleName) roles & throwNothing (DiscordError "No @everyone role")
+  membersRef       <- do
+    ms  <- listGuildMembersAll dis gid
+    var <- newIORef mempty
+    modifyIORef' var $ M.union $ M.fromList $ map (\m -> (m & memberUser & userId, m)) ms
+    pure var
+  asyncEvent       <- async
+    $ forever
+    $ takeMVar evMvar >>= onEvent gid ligumaCategoryId membersRef channelsRef
+  -- link async's ???
+  pure $ LigumaDiscord
+    { ldGuildId = gid
+    , ldRoleEveryone = roleEveryone
+    , ldMembers = membersRef
+    , ldLigumaCategoryId = ligumaCategoryId
+    , ldLigumaChannels = channelsRef
+    , ldAsyncMain = asyncMain
+    , ldAsyncEvent = asyncEvent
+    }
+  where
+    onlyOne [a] = Just a
+    onlyOne _   = Nothing
 
+    belongsToCat :: ChannelId -> Channel -> Bool
+    belongsToCat catId = \case
+      ChannelText  {channelParentId = Just catId} -> True
+      ChannelVoice {channelParentId = Just catId} -> True
+      _ -> False
+
+    onEvent guildId catId membersRef channelsRef = \case
+      ChannelCreate ch | belongsToCat catId ch             -> pure ()
+      ChannelUpdate ch | belongsToCat catId ch             -> pure ()
+      ChannelDelete ch | belongsToCat catId ch             -> pure ()
+      GuildMemberAdd gid mem | gid == guildId               -> pure ()
+      GuildMemberUpdate gid _roles user _a | gid == guildId -> pure ()
+      GuildMemberRemove gid user | gid == guildId           -> pure ()
+      GuildMemberChunk gid mems | gid == guildId            -> pure () -- ??
+      _ -> pure ()
+
+
+
+-- pPrint ms
+-- let topic = "test\nです"
+-- let name = "c1345223"
+-- let overwrite
+--       = mkRoleOverwrite 0 allPermissions roleEveryone
+--       : map (mkMemberOverwrite userAllowPermissions 0) ms
+-- let opts = R.CreateGuildChannelOptsText
+--       { createGuildChannelOptsTopic = Just topic
+--       , createGuildChannelOptsUserMessageRateDelay = Nothing
+--       , createGuildChannelOptsIsNSFW = Nothing
+--       , createGuildChannelOptsCategoryId = Just ligumaCatId
+--       }
+-- throwLeft =<< restCall dis (R.CreateGuildChannel gid name overwrite opts)
 
 throwLeft :: Exception e => Either e a -> IO a
 throwLeft = either throwIO pure
@@ -165,7 +202,7 @@ mkRoleOverwrite allow deny role = DIR.Overwrite
 startDiscord
   :: DiscordToken
   -> (DiscordHandle -> Event -> IO ())
-  -> IO DiscordHandle
+  -> IO (DiscordHandle, Async Text)
 startDiscord (DiscordToken token) onEvent = do
   handleTmvar <- newEmptyTMVarIO
   let opts = def
@@ -175,7 +212,8 @@ startDiscord (DiscordToken token) onEvent = do
         }
   disAsync <- async $ runDiscord opts
   -- onStart が呼ばれる前に discord スレッドが死ぬ可能性があるので。
-  atomically $ readTMVar handleTmvar <|> (waitSTM disAsync >>= throwSTM . DiscordError)
+  disHandle <- atomically $ readTMVar handleTmvar <|> (waitSTM disAsync >>= throwSTM . DiscordError)
+  pure (disHandle, disAsync)
   where
     onStart :: TMVar DiscordHandle -> DiscordHandle -> IO ()
     onStart handleTmvar dis =
