@@ -155,9 +155,6 @@ lookupMember LigumaDiscord{ldMembers} ud = do
   pure $ userId <$> find (\u -> userName u <> "#" <> userDiscrim u == ud) users
 
 -- | テキストチャンネルの作成
--- | 名前は一意的なものが勝手に振られる。
--- | 招待用のURLが返される
--- |
 mkChannels
   :: LigumaDiscord
   -> [UserId]
@@ -215,20 +212,6 @@ inviteUrl Invite{inviteCode} = "https://discord.gg/" <> inviteCode
 tillJust :: Monad m => m (Maybe a) -> m a
 tillJust m = m >>= maybe (tillJust m) pure
 
--- pPrint ms
--- let topic = "test\nです"
--- let name = "c1345223"
--- let overwrite
---       = mkRoleOverwrite 0 allPermissions roleEveryone
---       : map (mkMemberOverwrite userAllowPermissions 0) ms
--- let opts = R.CreateGuildChannelOptsText
---       { createGuildChannelOptsTopic = Just topic
---       , createGuildChannelOptsUserMessageRateDelay = Nothing
---       , createGuildChannelOptsIsNSFW = Nothing
---       , createGuildChannelOptsCategoryId = Just ligumaCatId
---       }
--- throwLeft =<< restCall dis (R.CreateGuildChannel gid name overwrite opts)
-
 throwLeft :: Exception e => Either e a -> IO a
 throwLeft = either throwIO pure
 
@@ -237,29 +220,6 @@ throwNothing e = maybe (throwIO e) pure
 
 restCall' :: (FromJSON b, DIR.Request (r b)) => DiscordHandle -> r b -> IO b
 restCall' dis req = throwLeft =<< restCall dis req
-
-
-createLimitedTextChannel
-  :: DiscordHandle
-  -> GuildId
-  -> Text
-  -> [GuildMember]
-  -> IO Channel
-createLimitedTextChannel dis gid name members = do
-  let topic = ""
-  let overwrite = members & map \mem -> DIR.Overwrite
-        { overwriteId = mem & memberUser & userId
-        , overwriteType = "member"
-        , overwriteAllow = 248896
-        , overwriteDeny = 0
-        }
-  let opts = R.CreateGuildChannelOptsText
-        { createGuildChannelOptsTopic = Just topic
-        , createGuildChannelOptsUserMessageRateDelay = Nothing
-        , createGuildChannelOptsIsNSFW = Nothing
-        , createGuildChannelOptsCategoryId = Nothing
-        }
-  throwLeft =<< restCall dis (R.CreateGuildChannel gid name overwrite opts)
 
 -- | * 権限回りの戦略
 -- |
