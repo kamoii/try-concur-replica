@@ -36,7 +36,26 @@ newtype DiscordError = DiscordError Text
   deriving Show
 instance Exception DiscordError
 
-test = do
+{-|
+
+チャンネルの管理。どんどん動的なチャンネルを作成した場合、いずれはリミットに達してしまう。
+そのため古いチャンネルは削除する必要がある。だが、チャンネル自体は作成日時を持たない。
+そのため以下のいずれかの手段の取る必要がある。
+
+ * 名前に順序をエンコーディング
+ * topic に作成時間をエンコーディング
+ *「リグマ」以下カテゴリで配置される順序で利用
+
+-}
+data LigumaDiscord = LigumaDiscord
+  { ldGuildId :: GuildId
+  , ldRoleEveryone :: Role
+  , ldMembers :: IORef [GuildMember]
+  , ldLigumaCategoryId :: ChannelId
+  , ldLigumaChannels :: IORef [Channel]
+  } deriving Generic
+
+initialize = do
   tok <- readDiscordToken
   dis <- startDiscord tok (\_ _ -> pure ())
   -- 現状一つのギルドのみに所属しているはず
@@ -58,20 +77,21 @@ test = do
   roleEveryone <- find ((=="@everyone") . roleName) roles & throwNothing (DiscordError "No @everyone role")
   -- 全ギルドメンバー
   ms <- listGuildMembersAll dis gid
-  pPrint ms
-  let topic = "test\nです"
-  let name = "c1345223"
-  let overwrite
-        = mkRoleOverwrite 0 allPermissions roleEveryone
-        : map (mkMemberOverwrite userAllowPermissions 0) ms
-  let opts = R.CreateGuildChannelOptsText
-        { createGuildChannelOptsTopic = Just topic
-        , createGuildChannelOptsUserMessageRateDelay = Nothing
-        , createGuildChannelOptsIsNSFW = Nothing
-        , createGuildChannelOptsCategoryId = Just ligumaCatId
-        }
-  throwLeft =<< restCall dis (R.CreateGuildChannel gid name overwrite opts)
+  -- pPrint ms
+  -- let topic = "test\nです"
+  -- let name = "c1345223"
+  -- let overwrite
+  --       = mkRoleOverwrite 0 allPermissions roleEveryone
+  --       : map (mkMemberOverwrite userAllowPermissions 0) ms
+  -- let opts = R.CreateGuildChannelOptsText
+  --       { createGuildChannelOptsTopic = Just topic
+  --       , createGuildChannelOptsUserMessageRateDelay = Nothing
+  --       , createGuildChannelOptsIsNSFW = Nothing
+  --       , createGuildChannelOptsCategoryId = Just ligumaCatId
+  --       }
+  -- throwLeft =<< restCall dis (R.CreateGuildChannel gid name overwrite opts)
   pure ()
+
 
 throwLeft :: Exception e => Either e a -> IO a
 throwLeft = either throwIO pure
@@ -108,9 +128,8 @@ createLimitedTextChannel dis gid name members = do
 -- | * 権限回りの戦略
 -- |
 -- |   * ギルドレベル @everyone は触らない
--- |   * カテゴリを一つ作成し、その @everyone は基本全て禁止に
--- |   * 動的に作成するチャネルはカテゴリ以下に付けて、特定のメンバーだけ
--- |     必要な権限のみ allow する
+-- |   * 動的に作成するチャネルは、@everyone に対して全不許可にし、
+-- |     特定のメンバーだけ必要な権限のみ allow する
 -- |
 -- | 2019/08/03
 -- | カテゴリの権限について理解が誤っているようだ
