@@ -61,7 +61,9 @@ test = do
   pPrint ms
   let topic = "test\nです"
   let name = "c1345223"
-  let overwrite = map (mkMemberOverwrite userAllowPermissions 0) ms
+  let overwrite
+        = mkRoleOverwrite 0 allPermissions roleEveryone
+        : map (mkMemberOverwrite userAllowPermissions 0) ms
   let opts = R.CreateGuildChannelOptsText
         { createGuildChannelOptsTopic = Just topic
         , createGuildChannelOptsUserMessageRateDelay = Nothing
@@ -74,6 +76,7 @@ test = do
 throwLeft :: Exception e => Either e a -> IO a
 throwLeft = either throwIO pure
 
+throwNothing :: Exception e => e -> Maybe a -> IO a
 throwNothing e = maybe (throwIO e) pure
 
 restCall' :: (FromJSON b, DIR.Request (r b)) => DiscordHandle -> r b -> IO b
@@ -112,16 +115,10 @@ createLimitedTextChannel dis gid name members = do
 -- | 2019/08/03
 -- | カテゴリの権限について理解が誤っているようだ
 
--- | テキストチャネル
--- | https://discordapi.com/permissions.html#216128
--- | 次の権限は落している
--- |
--- |   * TTS Message(読みあげ)
--- |   * 外部絵文字
--- |   * 添付ファイル
--- |   * メッセージ管理(他人のメッセージ削除)
--- |
-userAllowPermissions = 216128
+
+-- 2019/08/03時点で guild を作成したときに付いている権限
+-- https://discordapi.com/permissions.html#37215296
+userAllowPermissions = 37215296
 
 -- 全権限のbitを立てたもの
 -- https://discordapi.com/permissions.html#2146958847
