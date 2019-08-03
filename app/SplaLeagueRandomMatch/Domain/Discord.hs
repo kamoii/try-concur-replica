@@ -64,27 +64,34 @@ initialize = do
   tok              <- readDiscordToken
   evMvar           <- newEmptyMVar
   (dis, asyncMain) <- startDiscord tok \_ ev -> putMVar evMvar ev
-  pguild'          <- restCall' dis R.GetCurrentUserGuilds
-  pguild           <- onlyOne pguild' & throwNothing (DiscordError "予期せぬギルドに所属")
-  when (partialGuildName pguild /= "リグマ部屋") $ throwIO (DiscordError "予期せぬギルドに所属")
-  let gid          = partialGuildId pguild
-  chans            <- restCall' dis $ R.GetGuildChannels gid
-  let cats         = chans & map (preview #_ChannelGuildCategory) & catMaybes
-  ligumaCategoryId <- view _1 <$> find ((=="リグマ") . view _3) cats & throwNothing (DiscordError "「リグマ」カテゴリが見つかりせんでした")
-  let ligumaChans  = chans & filter (belongsToCat ligumaCategoryId)
-  channelsRef      <- newIORef mempty
-  modifyIORef' channelsRef $ M.union $ M.fromList $ map (\c -> (channelId c, c)) ligumaChans
-  roles            <- restCall' dis $ R.GetGuildRoles gid
-  roleEveryone     <- find ((=="@everyone") . roleName) roles & throwNothing (DiscordError "No @everyone role")
-  membersRef       <- do
+  gid <- do
+    pg' <- restCall' dis R.GetCurrentUserGuilds
+    pg  <- onlyOne pg' & throwNothing (DiscordError "予期せぬギルドに所属")
+    when (partialGuildName pg /= "リグマ部屋")
+      $ throwIO (DiscordError "予期せぬギルドに所属")
+    pure $ partialGuildId pg
+  (ligumaCategoryId, channelsRef) <- do
+    cs <- restCall' dis $ R.GetGuildChannels gid
+    let cats = catMaybes $ map (preview #_ChannelGuildCategory) cs
+    lcatId <- view _1 <$> find ((=="リグマ") . view _3) cats
+      & throwNothing (DiscordError "「リグマ」カテゴリが見つかりせんでした")
+    let ligumaChans = filter (belongsToCat lcatId) cs
+    var <- newIORef mempty
+    modifyIORef' var $ M.union $ M.fromList $ map (\c -> (channelId c, c)) ligumaChans
+    pure $ (lcatId, var)
+  roleEveryone <- do
+    rs <- restCall' dis $ R.GetGuildRoles gid
+    find ((=="@everyone") . roleName) rs
+      & throwNothing (DiscordError "No @everyone role")
+  membersRef <- do
     ms  <- listGuildMembersAll dis gid
     var <- newIORef mempty
     modifyIORef' var $ M.union $ M.fromList $ map (\m -> (m & memberUser & userId, m)) ms
     pure var
-  asyncEvent       <- async
+  asyncEvent <- async
     $ forever
     $ takeMVar evMvar >>= onEvent gid ligumaCategoryId membersRef channelsRef
-  -- link async's ???
+  link2 asyncMain asyncEvent
   pure $ LigumaDiscord
     { ldGuildId = gid
     , ldRoleEveryone = roleEveryone
@@ -104,15 +111,25 @@ initialize = do
       ChannelVoice {channelParentId = Just catId} -> True
       _ -> False
 
-    onEvent guildId catId membersRef channelsRef = \case
-      ChannelCreate ch | belongsToCat catId ch             -> pure ()
-      ChannelUpdate ch | belongsToCat catId ch             -> pure ()
-      ChannelDelete ch | belongsToCat catId ch             -> pure ()
-      GuildMemberAdd gid mem | gid == guildId               -> pure ()
-      GuildMemberUpdate gid _roles user _a | gid == guildId -> pure ()
-      GuildMemberRemove gid user | gid == guildId           -> pure ()
-      GuildMemberChunk gid mems | gid == guildId            -> pure () -- ??
-      _ -> pure ()
+    onEvent guildId catId membersRef channelsRef ev = do
+      let updateChns = modifyIORef' channelsRef
+      let updateMems = modifyIORef' membersRef
+      case ev of
+        ChannelCreate ch
+          | belongsToCat catId ch -> updateChns $ set (at $ channelId ch) (Just ch)
+        ChannelUpdate ch
+          | belongsToCat catId ch -> updateChns $ set (at $ channelId ch) (Just ch)
+        ChannelDelete ch
+          | belongsToCat catId ch -> updateChns $ set (at $ channelId ch) Nothing
+        GuildMemberAdd gid mem
+          | gid == guildId         -> updateMems $ set (at $ userId $ memberUser $ mem) (Just mem)
+        GuildMemberUpdate gid roles user nick
+          | gid == guildId         -> updateMems $ over (at $ userId user) $ \mem' -> mem' <&> \mem -> mem { memberUser = user, memberNick = nick, memberRoles = roles }
+        GuildMemberRemove gid user
+          | gid == guildId         -> updateMems $ set (at $ userId user) Nothing
+        GuildMemberChunk gid mems
+          | gid == guildId         -> pPrint mems *> pure () -- ??
+        _ -> pure ()
 
 
 
