@@ -4,6 +4,7 @@
 module Domain.Discord
   ( LigumaDiscord
   , initialize
+  , waitDeadSTM
   , lookupMember
   , mkChannels
   -- re-exports
@@ -140,6 +141,12 @@ initialize = do
         GuildMemberChunk gid mems
           | gid == guildId         -> pPrint mems *> pure () -- ??
         _ -> pure ()
+
+-- | 何らかの原因で死ぬのを wait する
+waitDeadSTM :: LigumaDiscord -> STM ()
+waitDeadSTM LigumaDiscord{ldAsyncMain, ldAsyncEvent} = do
+  _ <- waitCatchSTM ldAsyncMain <|> waitCatchSTM (absurd <$> ldAsyncEvent)
+  pure ()
 
 -- | username + '#' + descriminator から メンバーの UserId を取得する
 lookupMember :: LigumaDiscord -> Text -> IO (Maybe UserId)
