@@ -114,7 +114,7 @@ inputCondition initial = do
 
     tuuwaLabel = \case
       TuuwaAri -> "通話あり"
-      TuuwaNashi -> "通話なし"
+      TuuwaNashi -> "通話なし(テキストチャットのみ)"
       TuuwaEither -> "どちらでも良い"
 
     tuuwaRender tuuwa radio = do
@@ -137,7 +137,7 @@ inputCondition initial = do
         bi   = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
         mc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
         v    = (,) <$> lmap fst bi <*> lmap snd mc
-      in pure . applyV v
+      in pure . applyPure v
 
     paddingLeft i =
       div [ style [("padding-left", i)] ] . one
@@ -222,7 +222,7 @@ main = do
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css")])]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/chota@latest")])]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/marx-css/css/marx.min.css")])]
-  let index = defaultIndex "#リグマ" header'
+  let index = defaultIndex "#リグマ部屋" header'
   let wsopt = defaultConnectionOptions
   ctx <- mkCtx
   run 8080 index wsopt id E.acquire E.release $ \rs -> do

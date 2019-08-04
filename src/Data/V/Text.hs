@@ -13,15 +13,15 @@ import Text.Regex.PCRE.Heavy (re, Regex, (=~))
 
 -- | 空白が何を意味するか？
 -- | ゼロ個以上の空文字で構成されている場合
-notBlank :: V () Text Text
+notBlank :: Applicative m => V m () Text Text
 notBlank = fromPred (not . T.all C.isSpace)
 
 -- | 長さ制限
-lessThan :: Int -> V () Text Text
+lessThan :: Applicative m => Int -> V m () Text Text
 lessThan l = fromPred ((<=l) . T.length)
 
 -- | 正規表現による
 -- :set -XQuasiQuotes
 -- e.g. regex [re|^http.*|]
-regex :: Regex -> V () Text Text
+regex :: Applicative m => Regex -> V m () Text Text
 regex rgx = fromPred \t -> t =~ rgx

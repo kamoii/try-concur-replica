@@ -86,25 +86,31 @@ Category と Applicative の性質が異なるのはいいのか？
 -}
 
 -- conV or Validate
-newtype V e i o = V { applyV :: i -> Either e o }
+newtype V m e i o = V { applyV :: i -> m (Either e o) }
 
-instance Functor (V e i) where
-  fmap f (V v) = V $ f <<$>> v
+applyM :: V m e i o -> i -> m (Either e o)
+applyM = applyV
 
-instance Profunctor (V e) where
+applyPure :: V Identity e i o -> i -> Either e o
+applyPure (V f) = runIdentity . f
+
+instance Functor m => Functor (V m e i) where
+  fmap f (V v) = V $ fmap f <<$>> v
+
+instance Functor m => Profunctor (V m e) where
   lmap f (V v) = V $ v . f
   rmap = fmap
 
-instance Semigroup e => Applicative (V e i) where
-  pure = V . const . Right
+instance (Applicative m, Semigroup e) => Applicative (V m e i) where
+  pure = V . const . pure . Right
   liftA2 = andAlso
 
-instance Semigroup e => ProductProfunctor (V e) where
+instance (Applicative m, Semigroup e) => ProductProfunctor (V m e) where
   purePP = pure
   (****) = (<*>)
 
-instance Category (V e) where
-  id = V Right
+instance Monad m => Category (V m e) where
+  id = V (fmap pure Right)
   (.) = flip andThen
 
 -- | `lmap` の lens版
@@ -116,47 +122,58 @@ lmapL l = lmap (view l)
 -- !! このライブラリは純粋に validatoin だけじゃないことに注意。
 -- !! そのため、例えば前後の無駄な空白を削るなどの処理もOK。
 -- 名前、`idmap` でもいい気がしてきた。あ、id自体が何もしない map の意味を含んんでるから駄目か...
-to :: (i -> i') -> V e i i'
-to f = V $ Right . f
+to :: Applicative m => (i -> i') -> V m e i i'
+to f = V $ pure . Right . f
 
 -- 型パラメータの位置の関係で Bifunctorに出来無いため
-emap :: (e -> e') -> V e i o -> V e' i o
-emap f (V v) = V $ (first f) <$> v
+emap :: Functor m => (e -> e') -> V m e i o -> V m e' i o
+emap f (V v) = V $ (fmap (first f)) <$> v
 
+(<!>) :: Functor m => (e -> e') -> V m e i o -> V m e' i o
 (<!>) = emap
 infixl 4 <!>
 
--- これさすがに名前微妙か？
-(&<!>) = flip emap
-infixl 1 &<!>
-
-(<!) :: e' -> V e i o -> V e' i o
+(<!) :: Functor m => e' -> V m e i o -> V m e' i o
 (<!) e v = emap (const e) v
 infixl 4 <!
 
-(!>) :: V e i o -> e' -> V e' i o
+(!>) :: Functor m => V m e i o -> e' -> V m e' i o
 (!>) = flip (<!)
 infixl 4 !>
 
 -- either
 -- 左辺のエラーか右辺のエラー
-andThen' :: V e i o -> V e' o o' -> V (Either e e') i o'
-andThen' (V v0) (V v1) =
-  V $ first Left <$> v0 >=> first Right <$> v1
+andThen' :: Monad m => V m e i o -> V m e' o o' -> V m (Either e e') i o'
+andThen' (V v0) (V v1) = V $ \i -> do
+  o <- v0 i
+  case o of
+    Left e  -> pure $ Left $ Left e
+    Right o -> do
+      o' <- v1 o
+      pure $ case o' of
+        Left e   -> Left $ Right e
+        Right o' -> Right o'
+
 
 -- | Alias for Category's `>>>`
 -- TODO: delete?
-andThen :: V e i o -> V e o o' -> V e i o'
-andThen v0 v1 = andThen' v0 v1 &<!> (either id id)
+andThen :: Monad m => V m e i o -> V m e o o' -> V m e i o'
+andThen v0 v1 = either id id <!> andThen' v0 v1
 
 -- | alias for Applicative's `liftA`
-andAlso :: Semigroup e => (o -> o' -> o'') -> V e i o -> V e i o' -> V e i o''
+andAlso
+  :: (Applicative m, Semigroup e)
+  => (o -> o' -> o'')
+  -> V m e i o
+  -> V m e i o'
+  -> V m e i o''
 andAlso f (V v0) (V v1) = V \i ->
-  case (v0 i, v1 i) of
-    (Left e, Right _)    -> Left e
-    (Right _, Left e)    -> Left e
-    (Left e0, Left e1)   -> Left $ e0 <> e1
-    (Right o0, Right o1) -> Right $ f o0 o1
+  let g v = case v of
+              (Left e, Right _)    -> Left e
+              (Right _, Left e)    -> Left e
+              (Left e0, Left e1)   -> Left $ e0 <> e1
+              (Right o0, Right o1) -> Right $ f o0 o1
+  in liftA2 (curry g) (v0 i) (v1 i)
 
 -- | alias for `sequenceA`.
 -- | 結果の t o どうしよう...
@@ -165,5 +182,5 @@ andAlso f (V v0) (V v1) = V \i ->
 -- satisfyAll = sequenceA
 
 -- | Create `V` by prediction function. `True` means valid.
-fromPred :: (i -> Bool) -> V () i i
-fromPred p = V \i -> bool (Left ()) (Right i) (p i)
+fromPred :: Applicative m => (i -> Bool) -> V m () i i
+fromPred p = V \i -> pure $ bool (Left ()) (Right i) (p i)
