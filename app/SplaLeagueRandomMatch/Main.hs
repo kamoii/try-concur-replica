@@ -26,6 +26,7 @@ import qualified Concur.Replica.Control.Exception as E
 import           Concur.Replica.Widget.Input
 --
 import Domain
+import qualified Domain.Discord as Dis
 
 {-
 良く考えたら randomって入れる必要ないな。
@@ -76,24 +77,35 @@ welcome ctx =
   雰囲気
 
 -}
-inputCondition :: _ => (BaseInfo, MatchingCondition) -> m (BaseInfo, MatchingCondition)
-inputCondition initial = do
+
+data BaseInfoInput = BaseInfoInput
+  { biiDiscordUser :: Text            -- ^ e.g. foo#3124
+  , biiFriendCode :: Text
+  , biiNote :: Text
+  } deriving Generic
+
+inputCondition
+  :: _
+  => Dis.LigumaDiscord
+  -> (BaseInfoInput, MatchingCondition)
+  -> m (BaseInfoInput, BaseInfo, MatchingCondition)
+inputCondition dis initial = do
   inputWithValidation validate initial \e i ->
     -- form [] . one $ fieldset []
     orr
     [ fieldset []
       [ legend [] [ t "条件入力" ]
       , Update <$> orr
-        [ label [] [ t "名前" ]
-        , zoom i (_1 . #ikaName) $ inputOnChange [ placeholder "例) ぼっち六号" ]
+        [ label [] [ t "DiscordユーザID" ]
+        , zoom i (_1 . #biiDiscordUser) $ inputOnChange [ placeholder "例) botti#5628" ]
         , label [] [ t "フレンドコード" ]
-        , zoom i (_1 . #ikaFriendCode) $ inputOnChange [ placeholder "例) 1234-5678-9012" ]
+        , zoom i (_1 . #biiFriendCode) $ inputOnChange [ placeholder "例) 1234-5678-9012" ]
         , label [] [ t "ランク帯" ]
         , paddingLeft "1rem" $ zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
         , label [] [ t "通話" ]
         , paddingLeft "1rem" $ zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
         , label [] [ t "使用武器、意気込み等" ]
-        , zoom i (_1 . #ikaNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
+        , zoom i (_1 . #biiNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
         ]
       ]
     , Done <$ button [ onClick, style [("display", "block"), ("width", "100%"), ("margin", "1rem auto 0 auto")] ] [ t "探す!" ]
@@ -128,16 +140,21 @@ inputCondition initial = do
     codeRegex = [re|^((sw|SW|ＳＷ)(-|ー)?)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}(-|ー)?[0-9０-９]{4}$|]
 
     -- TODO: validation ルールはドメインの話だよね
+    validate
+      :: _
+      => (BaseInfoInput, MatchingCondition)
+      -> m (Either [Text] (BaseInfoInput, BaseInfo, MatchingCondition))
     validate =
       let
         lessThan' name len = lessThan len !> [ name <> "は" <> show len <> "文字以内に入力してください" ]
-        name = to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
-        code = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "フレンドコードの形式が違います" ]
-        note = to T.strip >>> lessThan' "使用武器、意気込み等" maxNoteLength
-        bi   = BaseInfo <$> lmapL #ikaName name <*> lmapL #ikaFriendCode code <*> lmapL #ikaNote note
-        mc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
-        v    = (,) <$> lmap fst bi <*> lmap snd mc
-      in pure . applyPure v
+        -- name = to T.strip >>> notBlank !> ["名前は必須です"] >>> lessThan' "名前" maxNameLength
+        vDis  = fromEither $ maybeToRight ["サーバのメンバーではありません。"] <<$>> (liftIO <$> Dis.lookupMember dis)
+        vCode = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "フレンドコードの形式が違います" ]
+        vNote = to T.strip >>> lessThan' "使用武器、意気込み等" maxNoteLength
+        vBi   = BaseInfo <$> lmapL #biiDiscordUser vDis <*> lmapL #biiFriendCode vCode <*> lmapL #biiNote vNote
+        vMc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
+        v     = (,,) <$> to fst <*> lmap fst vBi <*> lmap snd vMc
+      in applyM v
 
     paddingLeft i =
       div [ style [("padding-left", i)] ] . one
@@ -203,7 +220,7 @@ matchRoom :: _ => Ctx -> MatchMember -> Match -> m ()
 matchRoom ctx mem match = do
   div []
     [ h1 [] [ t "マッチしました!" ]
-    , div [] $ map displayMember $ match ^. #matchMembers
+    -- , div [] $ map displayMember $ match ^. #matchMembers
     , () <$ button [ onClick ] [ t "部屋を抜ける" ]
     ]
   where
@@ -225,6 +242,7 @@ main = do
   let index = defaultIndex "#リグマ部屋" header'
   let wsopt = defaultConnectionOptions
   ctx <- mkCtx
+  dis <- Dis.initialize
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
     id <- liftIO $ genId
     orr
@@ -233,22 +251,22 @@ main = do
         [ do
             welcome ctx
             untilRight (initialBaseInfo,initialMc) \i' -> do
-              i@(bi, mc) <- inputCondition i'
+              (bii, bi, mc) <- inputCondition dis i'
               let mem = MatchMember id bi mc
               r <- matching rs ctx mem $ matchRoom ctx mem
               case r of
-                Left MFTimeout -> pure $ Left i
-                Left MFCancel  -> pure $ Left i
-                Right _        -> pure $ Left i
+                Left MFTimeout -> pure $ Left (bii, mc)
+                Left MFCancel  -> pure $ Left (bii, mc)
+                Right _        -> pure $ Left (bii, mc)
         ]
       , footer []
         [ t "@kamoii" ]
       ]
   where
-    initialBaseInfo = BaseInfo
-      { ikaName = ""
-      , ikaFriendCode = ""
-      , ikaNote = ""
+    initialBaseInfo = BaseInfoInput
+      { biiDiscordUser = ""
+      , biiFriendCode = ""
+      , biiNote = ""
       }
     initialMc = MatchingCondition
       { mcRankTai = RankAtoS

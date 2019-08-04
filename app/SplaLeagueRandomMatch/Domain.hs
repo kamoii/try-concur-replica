@@ -24,6 +24,7 @@ import           System.Random (randomIO)
 
 import Domain.Types
 import qualified Domain.Matching as D
+import qualified Domain.Discord as Dis
 
 {- | ドメインコード
 

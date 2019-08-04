@@ -184,3 +184,5 @@ andAlso f (V v0) (V v1) = V \i ->
 -- | Create `V` by prediction function. `True` means valid.
 fromPred :: Applicative m => (i -> Bool) -> V m () i i
 fromPred p = V \i -> pure $ bool (Left ()) (Right i) (p i)
+
+fromEither = V

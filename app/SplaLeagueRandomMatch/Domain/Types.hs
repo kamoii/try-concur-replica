@@ -7,6 +7,7 @@ module Domain.Types where
 
 import P
 import Data.Array (Ix)
+import Discord.Types (UserId)
 import qualified Relude.Extra.Enum as BEnum
 --
 
@@ -14,7 +15,7 @@ newtype ID = ID Int
   deriving (Eq, Ord, Show)
 
 data BaseInfo = BaseInfo
-  { ikaName :: Text
+  { ikaDiscordUserId :: UserId
   , ikaFriendCode :: Text
   , ikaNote :: Text
   } deriving (Generic, Show)
