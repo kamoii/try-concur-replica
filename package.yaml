@@ -144,6 +144,7 @@ executables:
     - time
     - uuid
     - discord-haskell
+    - neat-interpolation
 
 tests:
   try-concur-replica-test:

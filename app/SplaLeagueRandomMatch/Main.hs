@@ -18,7 +18,7 @@ import Data.V.Text as V
 --
 import           Network.WebSockets.Connection   (ConnectionOptions, defaultConnectionOptions)
 import           Concur.Core
-import           Concur.Replica.Extended hiding (id)
+import           Concur.Replica.Extended hiding (id, text)
 import           Concur.Replica.STM
 import           Concur.Replica.Control.Misc
 import           Concur.Replica.Control.Validation
@@ -27,6 +27,7 @@ import           Concur.Replica.Widget.Input
 --
 import Domain
 import qualified Domain.Discord as Dis
+import NeatInterpolation
 
 {-
 良く考えたら randomって入れる必要ないな。
@@ -47,16 +48,23 @@ twitter で見知らぬ人に声かけるのは抵抗がある
 スマフォでの動作保証ない。PCで見てね
 -}
 
-welcome :: _ =>  m ()
+welcome :: _ => m ()
 welcome =
   div []
-    [ h1 [] [ t "#リグマ部屋 v0.0.1" ]
-    -- このサービスを一言で
+    [ h1 [] [ t "#リグマ部屋(β)" ]
     , p [] [ t "スプラトゥーン2のリーグマッチ(通称「リグマ」)を一緒に遊ぶ人を探すためのサービスです。" ]
-    , p [] [ t "掲示板のように募集を行なうものではなく、条件(ランク帯、通話の有無)を入力して待っていれば、同条件の人が集り次第システムが自動的に4人決め Discord のチャンネルが作成します。" ]
-    , () <$ button [onClick] [ t "参加する" ]
-    -- , displaySTM (getWaitingNum ctx) $ \i -> span [] [ t $ show i ]
+
+    , p [] . one . t
+      $ "掲示板のように募集を行なうものではなく、条件(ランク帯、通話の有無)を入力して待っていれば、"
+      <> "同条件の人が集り次第システムが自動的に専用の Discord チャンネルの作成します。"
+
+    , button [ () <$ onClick, style btnStyle ] [ t "条件を入力する" ]
+
+    , p [ style [("margin-top", "2rem")] ] . one . strong [] . one . t
+      $ "❗現在まだベータ版です。見ているブラウザやサーバの状況によっては動作が不安定な可能性があります。"
     ]
+  where
+    btnStyle = [("dislay", "block"), ("width", "100%"), ("background-color", "#a0d8ef")]
 
 
 {-| 入力画面
@@ -95,6 +103,7 @@ inputCondition dis initial = do
       [ legend [] [ t "条件入力" ]
       , Update <$> orr
         [ label [] [ t "DiscordユーザID" ]
+        , br []
         , small []
           [ t "通話・チャットには Discord を利用します。まだ「リグマ部屋」のメンバーではない場合、先に"
           , a [ href "" ] [ t "" ]
@@ -249,7 +258,7 @@ main = do
   dis <- Dis.initialize
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
     orr
-      [ header [] [ h3 [] [ t "#リグマ部屋(β)" ] ]
+      [ header_
       , main_ []
         [ do
             -- Discord回りでスレッドが止まってしまった時点でエラー画面を表示する
@@ -257,8 +266,7 @@ main = do
             _ <- liftIO (atomically $ Dis.waitDeadSTM dis) <|> routeStart rs ctx dis
             t "500 サーバエラー"
         ]
-      , footer []
-        [ t "@kamoii" ]
+      , footer_
       ]
   where
     -- Main route
@@ -286,3 +294,20 @@ main = do
       { mcRankTai = RankAtoS
       , mcTuuwa = TuuwaEither
       }
+
+    header_ = header
+      []
+      [ strong [] [ t "#リグマ部屋(β)" ] ]
+
+    footer_ = footer
+      [ style [("margin-top", "2rem"), ("padding", "0.5rem"), ("border-top", "2px solid #d3d3d3"), ("background-color", "#f5f5f5")] ]
+      [ small [] [ t "v0.0.1" ]
+      , br []
+      , link_ "https://twitter.com/kamoii" "kamoii@twitter"
+      , br []
+      , link_ "https://twitter.com/kamoii" "リグマ部屋@discord"
+      ]
+      where
+        link_ url txt = a
+          [ href url, style [("text-decoration", "none")] ]
+          [ small [] [ t txt ] ]
