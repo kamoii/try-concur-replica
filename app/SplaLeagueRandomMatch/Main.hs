@@ -32,11 +32,9 @@ import qualified Domain.Discord as Dis
 良く考えたら randomって入れる必要ないな。
 どっちかというと「条件が合う人が集まるまで待つ」、だ
 
-人数が集まったら自動的に discord のチャンネルが作成されます
-
 
 リグマやりたいのにイカ友達がいない・集まらない
-twitter で見知らぬイカに声かけるのは抵抗がある
+twitter で見知らぬ人に声かけるのは抵抗がある
 ガチマに疲れた
 
 では、入力画面にgo-
@@ -49,15 +47,15 @@ twitter で見知らぬイカに声かけるのは抵抗がある
 スマフォでの動作保証ない。PCで見てね
 -}
 
-welcome :: _ => Ctx -> m ()
-welcome ctx =
+welcome :: _ =>  m ()
+welcome =
   div []
-    [ h1 [] [ t "#リグマ部屋(beta)" ]
+    [ h1 [] [ t "#リグマ部屋 v0.0.1" ]
     -- このサービスを一言で
-    , p [] [ t "スプラトゥーン2でリーグマッチ(通称「リグマ」)の仲間と" ]
-    , p [] [ t "条件(ランク帯、通話の有無)を入力してマッチング!" ]
-    -- , displaySTM (getWaitingNum ctx) $ \i -> span [] [ t $ show i ]
+    , p [] [ t "スプラトゥーン2のリーグマッチ(通称「リグマ」)を一緒に遊ぶ人を探すためのサービスです。" ]
+    , p [] [ t "掲示板のように募集を行なうものではなく、条件(ランク帯、通話の有無)を入力して待っていれば、同条件の人が集り次第システムが自動的に4人決め Discord のチャンネルが作成します。" ]
     , () <$ button [onClick] [ t "参加する" ]
+    -- , displaySTM (getWaitingNum ctx) $ \i -> span [] [ t $ show i ]
     ]
 
 
@@ -267,7 +265,7 @@ main = do
     routeStart :: _ => _ -> _ -> _ -> m a
     routeStart rs ctx dis = do
       id <- liftIO $ genId
-      welcome ctx
+      welcome
       untilRight (initialBaseInfo,initialMc) \i' -> do
           (bii, bi, mc) <- inputCondition dis i'
           let mem = MatchMember id bi mc
