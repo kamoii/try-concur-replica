@@ -121,7 +121,9 @@ inputCondition dis initial = do
         -- , zoom i (_1 . #biiNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
         ]
       ]
-    , Done <$ button [ onClick, style [("display", "block"), ("width", "100%"), ("margin", "1rem auto 0 auto")] ] [ t "探す!" ]
+    , button
+      [ Done <$ onClick, style [("display", "block"), ("width", "100%"), ("background-color", "#a0d8ef")] ]
+      [ t "参加する!" ]
     , whenJust e \errs -> ul [] (map (li [] . one . span [style [("color", "red")]] . one . t) errs)
     ]
   where
@@ -200,8 +202,18 @@ matching rs ctx mem cb = do
       r <- orr
         [ Right <$> liftIO matchWait
         , Left <$> div []
-          [ MFTimeout <$ countdown 10 \i -> h1 [] [ t $ show i ]
-          , MFCancel <$ button [ onClick ] [ t "cancel" ]
+          [ p
+            [ style [("margin-top", "2rem")]]
+            [ t "メンバーが集まるのを待っています。" ]
+          , MFTimeout <$ countdown 100 \i ->
+              orr
+              [ t "あと "
+              , h2 [ style [("display", "inline-block")] ] [ t $ show i ]
+              , t " 秒待ちます..."
+              ]
+          , div
+            [ style [("margin-top", "2rem")] ]
+            [ button [ MFCancel <$ onClick ] [ t "キャンセル" ] ]
           ]
         ]
       case r of
