@@ -32,7 +32,7 @@ import qualified Domain.Discord as Dis
 良く考えたら randomって入れる必要ないな。
 どっちかというと「条件が合う人が集まるまで待つ」、だ
 
-+スプラトゥーン2のリグマをやりたい奴が集ってランダムにマッチするサービスです。+
+人数が集まったら自動的に discord のチャンネルが作成されます
 
 
 リグマやりたいのにイカ友達がいない・集まらない
@@ -97,6 +97,11 @@ inputCondition dis initial = do
       [ legend [] [ t "条件入力" ]
       , Update <$> orr
         [ label [] [ t "DiscordユーザID" ]
+        , small []
+          [ t "通話・チャットには Discord を利用します。まだ「リグマ部屋」のメンバーではない場合、先に"
+          , a [ href "" ] [ t "" ]
+          , t "にアクセスしてメンバーになる必要があります。"
+          ]
         , zoom i (_1 . #biiDiscordUser) $ inputOnChange [ placeholder "例) botti#5628" ]
         , label [] [ t "フレンドコード" ]
         , zoom i (_1 . #biiFriendCode) $ inputOnChange [ placeholder "例) 1234-5678-9012" ]
@@ -104,8 +109,9 @@ inputCondition dis initial = do
         , paddingLeft "1rem" $ zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
         , label [] [ t "通話" ]
         , paddingLeft "1rem" $ zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
-        , label [] [ t "使用武器、意気込み等" ]
-        , zoom i (_1 . #biiNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
+        -- まあ別に不要か取りあえず
+        -- , label [] [ t "使用武器、意気込み等" ]
+        -- , zoom i (_1 . #biiNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
         ]
       ]
     , Done <$ button [ onClick, style [("display", "block"), ("width", "100%"), ("margin", "1rem auto 0 auto")] ] [ t "探す!" ]
@@ -126,7 +132,7 @@ inputCondition dis initial = do
 
     tuuwaLabel = \case
       TuuwaAri -> "通話あり"
-      TuuwaNashi -> "通話なし(テキストチャットのみ)"
+      TuuwaNashi -> "通話なし(チャットのみ)"
       TuuwaEither -> "どちらでも良い"
 
     tuuwaRender tuuwa radio = do
@@ -244,30 +250,40 @@ main = do
   ctx <- mkCtx
   dis <- Dis.initialize
   run 8080 index wsopt id E.acquire E.release $ \rs -> do
-    id <- liftIO $ genId
     orr
       [ header [] [ h3 [] [ t "#リグマ部屋(β)" ] ]
       , main_ []
         [ do
-            welcome ctx
-            untilRight (initialBaseInfo,initialMc) \i' -> do
-              (bii, bi, mc) <- inputCondition dis i'
-              let mem = MatchMember id bi mc
-              r <- matching rs ctx mem $ matchRoom ctx mem
-              case r of
-                Left MFTimeout -> pure $ Left (bii, mc)
-                Left MFCancel  -> pure $ Left (bii, mc)
-                Right _        -> pure $ Left (bii, mc)
+            -- Discord回りでスレッドが止まってしまった時点でエラー画面を表示する
+            -- TODO: 再起動するべきかな？
+            _ <- liftIO (atomically $ Dis.waitDeadSTM dis) <|> routeStart rs ctx dis
+            t "500 サーバエラー"
         ]
       , footer []
         [ t "@kamoii" ]
       ]
   where
+    -- Main route
+    routeStart :: _ => _ -> _ -> _ -> m a
+    routeStart rs ctx dis = do
+      id <- liftIO $ genId
+      welcome ctx
+      untilRight (initialBaseInfo,initialMc) \i' -> do
+          (bii, bi, mc) <- inputCondition dis i'
+          let mem = MatchMember id bi mc
+          r <- matching rs ctx mem $ matchRoom ctx mem
+          case r of
+            Left MFTimeout -> pure $ Left (bii, mc)
+            Left MFCancel  -> pure $ Left (bii, mc)
+            Right _        -> pure $ Left (bii, mc)
+      t "the end."
+
     initialBaseInfo = BaseInfoInput
       { biiDiscordUser = ""
       , biiFriendCode = ""
       , biiNote = ""
       }
+
     initialMc = MatchingCondition
       { mcRankTai = RankAtoS
       , mcTuuwa = TuuwaEither
