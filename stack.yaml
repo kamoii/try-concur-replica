@@ -48,6 +48,10 @@ extra-deps:
   subdirs:
     - concur-core
 - emoji-0.1.0.2@sha256:d995572a5c7dcd28f98eb15c6e387a7b3bda1ac2477ab0d9dba8580d5d7b161f,1273
+- hex-text-0.1.0.0@sha256:52dc2cf5ce45f7d86ea5e56e2ac57820f788c10bbb3fe83f6d57e678a426305b,1072
+- chronos-1.0.6@sha256:ff7399115163d345d24bdb98ed3e83042bb5eca901c7a6230c3d08727330ce94,3792
+- torsor-0.1@sha256:9c6f152650322357bee013a224d9d7ec8e8ae9fe32d8cee45f1431c49b0129e2,558
+
 # - discord-haskell-1.0.0
 
 # Override default flag values for local packages and extra-deps
