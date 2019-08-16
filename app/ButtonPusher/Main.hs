@@ -21,10 +21,10 @@ main :: IO ()
 main = do
   participantNum <- newTVarIO 0
   counter        <- newTVarIO 0
-  run 8080 (defaultIndex "Button Pusher" mempty) defaultConnectionOptions P.id
-    (atomically $ modifyTVar' participantNum (+1))
-    (const $ atomically $ modifyTVar' participantNum (+(-1)))
-    $ const $ do
+  let req = atomically $ modifyTVar' participantNum (+1)
+  let rel = const $ atomically $ modifyTVar' participantNum (+(-1))
+  let cnf = mkDefaultConfig' 8080 "Button Pusher" req rel
+  run cnf $ \_ -> do
     div []
       [ h1 [] [ text "Button Pusher!" ]
       , p  [] [ text "Dumbest online game in the world. Just enjoy how the counter goes up." ]

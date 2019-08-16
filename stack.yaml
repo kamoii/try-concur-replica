@@ -33,6 +33,7 @@ packages:
 - /home/sino/mygithub/concur-replica
 - /home/sino/mygithub/replica
 - /home/sino/mygithub/discord-haskell
+- /home/sino/mygithub/websockets
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as
 # forks / in-progress versions pinned to a git hash. For example:

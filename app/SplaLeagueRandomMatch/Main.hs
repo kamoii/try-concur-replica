@@ -264,22 +264,22 @@ main = do
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css")])]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/chota@latest")])]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/marx-css/css/marx.min.css")])]
-  let index = defaultIndex "#リグマ部屋" header'
-  let wsopt = defaultConnectionOptions
   ctx <- mkCtx
   dis <- Dis.initialize
-  run 8080 index wsopt id E.acquire E.release $ \rs -> do
-    orr
-      [ header_
-      , main_ []
-        [ do
-            -- Discord回りでスレッドが止まってしまった時点でエラー画面を表示する
-            -- TODO: 再起動するべきかな？
-            _ <- liftIO (atomically $ Dis.waitDeadSTM dis) <|> routeStart rs ctx dis
-            t "500 サーバエラー"
-        ]
-      , footer_
-      ]
+  let cnf' = mkDefaultConfig' 8080 "#リグマ部屋" E.acquire E.release
+  let cnf = cnf' { cfgHeader = header' }
+  run cnf \rs -> do
+     orr
+       [ header_
+       , main_ []
+         [ do
+             -- Discord回りでスレッドが止まってしまった時点でエラー画面を表示する
+             -- TODO: 再起動するべきかな？
+             _ <- liftIO (atomically $ Dis.waitDeadSTM dis) <|> routeStart rs ctx dis
+             t "500 サーバエラー"
+         ]
+       , footer_
+       ]
   where
     -- Main route
     routeStart :: _ => _ -> _ -> _ -> m a
