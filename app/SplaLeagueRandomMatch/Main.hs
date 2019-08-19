@@ -60,8 +60,8 @@ welcome =
 
     , button [ () <$ onClick, style btnStyle ] [ t "条件を入力する" ]
 
-    , p [ style [("margin-top", "2rem")] ] . one . strong [] . one . t
-      $ "❗現在まだベータ版です。見ているブラウザやサーバの状況によっては動作が不安定な可能性があります。"
+    -- , p [ style [("margin-top", "2rem")] ] . one . strong [] . one . t
+    --   $ "❗現在まだベータ版です。見ているブラウザやサーバの状況によっては動作が不安定な可能性があります。"
     ]
   where
     btnStyle = [("dislay", "block"), ("width", "100%"), ("background-color", "#a0d8ef")]
@@ -127,22 +127,11 @@ inputCondition dis initial = do
     , whenJust e \errs -> ul [] (map (li [] . one . span [style [("color", "red")]] . one . t) errs)
     ]
   where
-    rankLabel = \case
-      RankCtoB       -> "C- ～ B+"
-      RankAtoS       -> "A- ～ S"
-      RankSpToX2100  -> "S+ ～ X2100"
-      RankAboveX2100 -> "X2100以上"
-
     rankRender rank radio = do
       div [] . one $ label []
         [ radio []
         , t $ rankLabel rank
         ]
-
-    tuuwaLabel = \case
-      TuuwaAri -> "通話あり"
-      TuuwaNashi -> "通話なし(チャットのみ)"
-      TuuwaEither -> "どちらでも良い"
 
     tuuwaRender tuuwa radio = do
       div [] . one $ label []
@@ -174,6 +163,17 @@ inputCondition dis initial = do
     paddingLeft i =
       div [ style [("padding-left", i)] ] . one
 
+rankLabel = \case
+  RankCtoB       -> "C- ～ B+"
+  RankAtoS       -> "A- ～ S"
+  RankSpToX2100  -> "S+ ～ X2100"
+  RankAboveX2100 -> "X2100以上"
+
+tuuwaLabel = \case
+  TuuwaAri -> "通話あり"
+  TuuwaNashi -> "通話なし(チャットのみ)"
+  TuuwaEither -> "どちらでも良い"
+
 {-| マッチング待機画面
 
  * キャンセル可能
@@ -191,10 +191,11 @@ matching
   :: _
   => E.ReleaseStack
   -> Ctx
+  -> MatchingCondition
   -> MatchMember
   -> (Match -> m r)
   -> m (Either MatchingFailed r)
-matching rs ctx mem cb = do
+matching rs ctx mc mem cb = do
   -- TODO: ここで bracket パターンなのはここの責務じゃない気がしますね。
   let acq = startMatching ctx mem
   let rel = \(canceler, _) -> canceler
@@ -202,9 +203,11 @@ matching rs ctx mem cb = do
       r <- orr
         [ Right <$> liftIO matchWait
         , Left <$> div []
-          [ p
-            [ style [("margin-top", "2rem")]]
-            [ t "メンバーが集まるのを待っています。" ]
+          [ p [ style [("margin-top", "2rem")]] [ t "メンバーが集まるのを待っています。" ]
+          , dl []
+            [ dt [] [ t "ランク帯" ], dd [] [ t $ rankLabel $ mcRankTai mc ]
+            , dt [] [ t "通話" ], dd [] [ t $ tuuwaLabel $ mcTuuwa mc ]
+            ]
           , MFTimeout <$ countdown 100 \i ->
               orr
               [ t "あと "
@@ -276,7 +279,7 @@ main = do
              -- Discord回りでスレッドが止まってしまった時点でエラー画面を表示する
              -- TODO: 再起動するべきかな？
              _ <- liftIO (atomically $ Dis.waitDeadSTM dis) <|> routeStart rs ctx dis
-             t "500 サーバエラー"
+             t "サーバエラーが発生しました"
          ]
        , footer_
        ]
@@ -287,13 +290,13 @@ main = do
       id <- liftIO $ genId
       welcome
       untilRight (initialBaseInfo,initialMc) \i' -> do
-          (bii, bi, mc) <- inputCondition dis i'
-          let mem = MatchMember id bi mc
-          r <- matching rs ctx mem $ matchRoom ctx mem
+          (bii, bi, cond) <- inputCondition dis i'
+          let mem = MatchMember id bi cond
+          r <- matching rs ctx cond mem $ matchRoom ctx mem
           case r of
-            Left MFTimeout -> pure $ Left (bii, mc)
-            Left MFCancel  -> pure $ Left (bii, mc)
-            Right _        -> pure $ Left (bii, mc)
+            Left MFTimeout -> pure $ Left (bii, cond)
+            Left MFCancel  -> pure $ Left (bii, cond)
+            Right _        -> pure $ Left (bii, cond)
       t "the end."
 
     initialBaseInfo = BaseInfoInput
