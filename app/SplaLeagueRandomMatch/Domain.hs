@@ -12,6 +12,7 @@ module Domain
   ) where
 
 import P hiding (span, id, whenJust)
+import Control.Lens
 import Control.Category (id)
 import Data.V.Core as V
 import Data.V.Text as V
@@ -20,6 +21,7 @@ import qualified Relude.Extra.Enum as BEnum
 import           Control.Concurrent.STM (throwSTM)
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent     (threadDelay)
+import           Control.Exception      (mask, throwIO, try)
 import           System.Random (randomIO)
 
 import Domain.Types
@@ -76,22 +78,32 @@ getWaitingNum Ctx{ctxQueue} = D.waitingNum <$> readTVar ctxQueue
 -- 二番目の `IO Match` はマッチングするまでブロックする。マッチすると Match が返る。
 --
 -- TODO: canceler というか detacher ? のほうがいいかもな
-startMatching :: Ctx -> MatchMember -> IO (IO (), IO Match)
-startMatching Ctx{ctxQueue} mem = do
-  (tmvar, a) <- atomically $ do
-    tmvar <- newEmptyTMVar
-    let a = Attach (mem, tmvar) (memId mem)
-    ids' <- stateTVarM ctxQueue $ either throwSTM pure . D.addAndTryMatch (a, memMatchingCondition mem)
-    flip traverse_ ids' \(ids',rankTai,tuuwa) -> do
-      let members' = map attachment ids'
-      let match = Match (map fst members') rankTai tuuwa
-      -- ここでの TMVar はまだ空のはず
-      traverse_ (\(_,v) -> tryPutTMVar v match) members'
-    pure (tmvar, a)
-  let roomWait = atomically $ readTMVar tmvar
-  let canceler = atomically $ modifyTVar' ctxQueue (D.cancel a)
+startMatching :: Ctx -> Dis.LigumaDiscord -> MatchMember -> IO (IO (), IO Match)
+startMatching Ctx{ctxQueue} dis mem = do
+  (roomWait, canceler, matchMaybe) <- atomically $ do
+    var <- newEmptyTMVar
+    let a = Attach (mem, var) (memId mem)
+    matchMaybe <- stateTVarM ctxQueue
+      $ either throwSTM pure
+      . D.addAndTryMatch (a, memMatchingCondition mem)
+    pure
+      ( atomically $ readTMVar var
+      , atomically $ modifyTVar' ctxQueue (D.cancel a)
+      , (_1 %~ map attachment) <$> matchMaybe
+      )
+  -- 上記のSTMでそのまま Match をディスパッチしないのは、Match のため
+  -- の Discord のチャンネルを IO で作成する必要があるため。
+  case matchMaybe of
+    Nothing -> pure ()
+    Just v  -> mkMatchAndDispatch v
   pure (canceler, roomWait)
   where
+    mkMatchAndDispatch :: ([(MatchMember, TMVar Match)], RankTai, Tuuwa) -> IO ()
+    mkMatchAndDispatch (ms,rankTai,tuuwa) = do
+      let (members, vars) = unzip ms
+      let match = Match members rankTai tuuwa
+      atomically $ traverse_ (\v -> tryPutTMVar v match) vars
+
     stateTVarM :: TVar s -> (s -> STM (a, s)) -> STM a
     stateTVarM var f = do
       (a, s') <- f =<< readTVar var
