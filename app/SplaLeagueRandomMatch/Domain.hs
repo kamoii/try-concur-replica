@@ -76,7 +76,7 @@ getWaitingNum Ctx{ctxQueue} = D.waitingNum <$> readTVar ctxQueue
 genRoomName :: Ctx -> STM Text
 genRoomName Ctx{ctxRoomCount} = do
   i <- stateTVar ctxRoomCount \i -> (i, i+1)
-  pure $ "リグマ" <> show i
+  pure $ "リグマ" <> show i <> "番"
 
 -- | マッチングに参加する
 --

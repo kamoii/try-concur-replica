@@ -216,7 +216,7 @@ matching rs ctx dis mc mem cb = do
               , t " 秒待ちます..."
               ]
           , div
-            [ style [("margin-top", "2rem")] ]
+            [ style [("margin-top", "1rem")] ]
             [ button [ MFCancel <$ onClick ] [ t "キャンセル" ] ]
           ]
         ]
@@ -239,25 +239,32 @@ matching rs ctx dis mc mem cb = do
 
 現状は即座に部屋に入るでいい気がするな。不満があれば変える。
 
- * 他の人の状態
  * 他の人のフレコ、部屋立ての人を決定
- * +チャット+ -> discord
  * 退出ボタン(押しまちがいを防ぐ仕組みは必要かな)
+
 -}
 
 matchRoom :: _ => Ctx -> MatchMember -> Match -> m ()
-matchRoom ctx mem match = do
-  div []
-    [ h1 [] [ t "メンバーが集りました。" ]
-    -- , div [] $ map displayMember $ match ^. #matchMembers
-    , () <$ button [ onClick ] [ t "部屋を抜ける" ]
+matchRoom ctx self Match{..} = do
+  section []
+    [ h3 [] [ t "メンバーが集りました!" ]
+    , div [] [ b' "ランク帯: ", t (rankLabel matchRankTai <> ", "), b' "通話: ", t (tuuwaLabel matchTuuwa) ]
+    , div []
+      [ b' "Discordチャンネルに参加お願いします:"
+      , br []
+      , a [ target_ "_blank",  href matchTextChannelUrl ] [ t $ "#" <> matchRoomName ]
+      ]
+    , div [ style [("margin-bottom", "1rem")] ]
+      [ t "メンバー"
+      , ol [] $ map (\m -> li [] [ displayMember m ]) matchMembers
+      , small [] [ t "部屋立ては1番がお願いします。2, 3, 4 番は1番にフレンド申請お願いします。" ]
+      ]
+    , () <$ button [ onClick ] [ t "条件入力画面に戻る" ]
     ]
   where
-    displayMember mem = do
-      div []
-        [ h3 [] [ t $ mem ^. #memBaseInfo . #ikaName ]
-        , h5 [] [ t $ mem ^. #memBaseInfo . #ikaFriendCode ]
-        ]
+    b' txt = b [] [ t txt ]
+    displayMember MatchMember{memBaseInfo = BaseInfo{..}} =
+      t $ ikaDiscordUser <> " / " <> ikaFriendCode
 
 main :: IO ()
 main = do
