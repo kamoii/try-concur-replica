@@ -106,7 +106,7 @@ inputCondition dis initial = do
         , br []
         , small []
           [ t "通話・チャットには Discord を利用します。まだ「リグマ部屋」のメンバーではない場合、先に"
-          , a [ href "" ] [ t "" ]
+          , a [ href "https://discord.gg/6HPr8dv", target_ "_blank" ] [ t "招待URL" ]
           , t "にアクセスしてメンバーになる必要があります。"
           ]
         , zoom i (_1 . #biiDiscordUser) $ inputOnChange [ placeholder "例) botti#5628" ]
@@ -328,9 +328,9 @@ main = do
       , br []
       , link_ "https://twitter.com/kamoii" "kamoii@twitter"
       , br []
-      , link_ "https://twitter.com/kamoii" "リグマ部屋@discord"
+      , link_ "https://discord.gg/6HPr8dv" "リグマ部屋@discord"
       ]
       where
         link_ url txt = a
-          [ href url, style [("text-decoration", "none")] ]
+          [ href url, style [("text-decoration", "none")], target_ "_blank" ]
           [ small [] [ t txt ] ]
