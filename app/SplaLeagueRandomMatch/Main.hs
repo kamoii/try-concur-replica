@@ -155,7 +155,7 @@ inputCondition dis initial = do
         vDis  = fromEither $ maybeToRight ["サーバのメンバーではありません。"] <<$>> (liftIO <$> Dis.lookupMember dis)
         vCode = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "フレンドコードの形式が違います" ]
         vNote = to T.strip >>> lessThan' "使用武器、意気込み等" maxNoteLength
-        vBi   = BaseInfo <$> lmapL #biiDiscordUser vDis <*> lmapL #biiFriendCode vCode <*> lmapL #biiNote vNote
+        vBi   = BaseInfo <$> to biiDiscordUser <*> lmapL #biiDiscordUser vDis <*> lmapL #biiFriendCode vCode <*> lmapL #biiNote vNote
         vMc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
         v     = (,,) <$> to fst <*> lmap fst vBi <*> lmap snd vMc
       in applyM v
@@ -191,13 +191,14 @@ matching
   :: _
   => E.ReleaseStack
   -> Ctx
+  -> Dis.LigumaDiscord
   -> MatchingCondition
   -> MatchMember
   -> (Match -> m r)
   -> m (Either MatchingFailed r)
-matching rs ctx mc mem cb = do
+matching rs ctx dis mc mem cb = do
   -- TODO: ここで bracket パターンなのはここの責務じゃない気がしますね。
-  let acq = startMatching ctx mem
+  let acq = startMatching ctx dis mem
   let rel = \(canceler, _) -> canceler
   E.pbracket rs acq rel $ \(_, matchWait) -> do
       r <- orr
@@ -247,7 +248,7 @@ matching rs ctx mc mem cb = do
 matchRoom :: _ => Ctx -> MatchMember -> Match -> m ()
 matchRoom ctx mem match = do
   div []
-    [ h1 [] [ t "マッチしました!" ]
+    [ h1 [] [ t "メンバーが集りました。" ]
     -- , div [] $ map displayMember $ match ^. #matchMembers
     , () <$ button [ onClick ] [ t "部屋を抜ける" ]
     ]
@@ -292,7 +293,7 @@ main = do
       untilRight (initialBaseInfo,initialMc) \i' -> do
           (bii, bi, cond) <- inputCondition dis i'
           let mem = MatchMember id bi cond
-          r <- matching rs ctx cond mem $ matchRoom ctx mem
+          r <- matching rs ctx dis cond mem $ matchRoom ctx mem
           case r of
             Left MFTimeout -> pure $ Left (bii, cond)
             Left MFCancel  -> pure $ Left (bii, cond)

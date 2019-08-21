@@ -15,7 +15,8 @@ newtype ID = ID Int
   deriving (Eq, Ord, Show)
 
 data BaseInfo = BaseInfo
-  { ikaDiscordUserId :: Dis.UserId
+  { ikaDiscordUser :: Text          -- e.g. kamoii#0662
+  , ikaDiscordUserId :: Dis.UserId
   , ikaFriendCode :: Text
   , ikaNote :: Text
   } deriving (Generic, Show)
@@ -55,7 +56,9 @@ data MatchMember = MatchMember
 --   | EvComment MatchMember Text
 
 data Match = Match
-  { matchMembers :: [MatchMember]
+  { matchRoomName :: Text
+  , matchTextChannelUrl :: Text
+  , matchMembers :: [MatchMember]
   -- , matchEvents :: TVar (Seq MatchEvent)
   , matchRankTai :: RankTai
   , matchTuuwa :: Tuuwa

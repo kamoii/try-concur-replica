@@ -19,6 +19,7 @@ import Data.V.Text as V
 import qualified Relude.Extra.Enum as BEnum
 --
 import           Control.Concurrent.STM (throwSTM)
+import           Control.Concurrent.STM.TVar (stateTVar)
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent     (threadDelay)
 import           Control.Exception      (mask, throwIO, try)
@@ -55,12 +56,14 @@ instance Ord v => Ord (Attach a v) where
 
 data Ctx = Ctx
   { ctxQueue :: TVar (D.MatchingQueue (Attach (MatchMember,TMVar Match) ID))
+  , ctxRoomCount :: TVar Int
   }
 
 mkCtx :: IO Ctx
-mkCtx = do
-  q <- newTVarIO D.mkMatchingQueue
-  pure $ Ctx q
+mkCtx = atomically $ do
+  q <- newTVar D.mkMatchingQueue
+  c <- newTVar 1
+  pure $ Ctx q c
 
 genId :: IO ID
 genId = ID <$> randomIO
@@ -68,6 +71,12 @@ genId = ID <$> randomIO
 -- | 現在の待ち人数を取得する。
 getWaitingNum :: Ctx -> STM Int
 getWaitingNum Ctx{ctxQueue} = D.waitingNum <$> readTVar ctxQueue
+
+-- | 部屋名を生成する
+genRoomName :: Ctx -> STM Text
+genRoomName Ctx{ctxRoomCount} = do
+  i <- stateTVar ctxRoomCount \i -> (i, i+1)
+  pure $ "リグマ" <> show i
 
 -- | マッチングに参加する
 --
@@ -79,7 +88,7 @@ getWaitingNum Ctx{ctxQueue} = D.waitingNum <$> readTVar ctxQueue
 --
 -- TODO: canceler というか detacher ? のほうがいいかもな
 startMatching :: Ctx -> Dis.LigumaDiscord -> MatchMember -> IO (IO (), IO Match)
-startMatching Ctx{ctxQueue} dis mem = do
+startMatching ctx@Ctx{ctxQueue} dis mem = do
   (roomWait, canceler, matchMaybe) <- atomically $ do
     var <- newEmptyTMVar
     let a = Attach (mem, var) (memId mem)
@@ -101,8 +110,21 @@ startMatching Ctx{ctxQueue} dis mem = do
     mkMatchAndDispatch :: ([(MatchMember, TMVar Match)], RankTai, Tuuwa) -> IO ()
     mkMatchAndDispatch (ms,rankTai,tuuwa) = do
       let (members, vars) = unzip ms
-      let match = Match members rankTai tuuwa
+      let userIds = map (ikaDiscordUserId . memBaseInfo) members
+      roomName <- atomically $ genRoomName ctx
+      channelUrl <- Dis.mkChannels dis userIds roomName "Hello!" voiceToo
+      let match = Match
+            { matchRoomName = roomName
+            , matchTextChannelUrl = channelUrl
+            , matchMembers = members
+            , matchRankTai = rankTai
+            , matchTuuwa = tuuwa
+            }
       atomically $ traverse_ (\v -> tryPutTMVar v match) vars
+      where
+        voiceToo = case tuuwa of
+          TuuwaNashi -> False
+          _          -> True
 
     stateTVarM :: TVar s -> (s -> STM (a, s)) -> STM a
     stateTVarM var f = do
