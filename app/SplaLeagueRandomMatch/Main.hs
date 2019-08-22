@@ -258,12 +258,12 @@ matchRoom ctx self Match{..} = do
   section []
     [ h3 [] [ t "メンバーが集りました!" ]
     , div [] [ b' "ランク帯: ", t (rankLabel matchRankTai <> ", "), b' "通話: ", t (tuuwaLabel matchTuuwa) ]
-    , div []
+    , div [ style [("margin-bottom", "1rem"), ("margin-top", "1rem")] ]
       [ b' "Discordチャンネルに参加お願いします:"
       , br []
       , a [ target_ "_blank",  href matchTextChannelUrl ] [ t $ "#" <> matchRoomName ]
       ]
-    , div [ style [("margin-bottom", "1rem")] ]
+    , div [ style [("margin-bottom", "1rem"), ("margin-top", "1rem")] ]
       [ t "メンバー"
       , ol [] $ map (\m -> li [] [ displayMember m ]) matchMembers
       , small [] [ t "部屋立ては1番がお願いします。2番以降は1番にフレンド申請お願いします。" ]
