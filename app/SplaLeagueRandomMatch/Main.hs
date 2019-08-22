@@ -55,13 +55,13 @@ welcome =
     , p [] [ t "スプラトゥーン2のリーグマッチ(通称「リグマ」)を一緒に遊ぶ人を探すためのサービスです。" ]
 
     , p [] . one . t
-      $ "掲示板のように募集を行なうものではなく、条件(ランク帯、通話の有無)を入力して待っていれば、"
+      $ "掲示板のように募集を行なうものではなく、条件(※)を入力して待っていれば、"
       <> "同条件の人が集り次第システムが自動的に専用の Discord チャンネルの作成します。"
 
     , button [ () <$ onClick, style btnStyle ] [ t "条件を入力する" ]
 
-    -- , p [ style [("margin-top", "2rem")] ] . one . strong [] . one . t
-    --   $ "❗現在まだベータ版です。見ているブラウザやサーバの状況によっては動作が不安定な可能性があります。"
+    , p [ style [("margin-top", "2rem")] ] . one . strong [] . one . t
+      $ "※ ❗現在指定できる条件はランク帯のみで、他の条件は固定です(2人ペアチームかつ通話なし(チャットのみ))。人が集まるようでしたら雰囲気・チーム形態・通話の有無も指定できるようにします。"
     ]
   where
     btnStyle = [("dislay", "block"), ("width", "100%"), ("background-color", "#a0d8ef")]
@@ -112,10 +112,18 @@ inputCondition dis initial = do
         , zoom i (_1 . #biiDiscordUser) $ inputOnChange [ placeholder "例) botti#5628" ]
         , label [] [ t "フレンドコード" ]
         , zoom i (_1 . #biiFriendCode) $ inputOnChange [ placeholder "例) 1234-5678-9012" ]
+        -- 雰囲気は固定(エンジョイ)。これがないと最初は集まらないかな、と
+        , label [] [ t "雰囲気" ]
+        , paddingLeft "1rem" $ t "エンジョイ"
+        -- チーム形態は二人(ペア)限定
+        , label [] [ t "チーム形態" ]
+        , paddingLeft "1rem" $ t "2人(ペア)"
+        -- チーム形態は二人(ペア)限定
         , label [] [ t "ランク帯" ]
         , paddingLeft "1rem" $ zoom i (_2 . #mcRankTai) $ radioGroupBEnum rankRender
         , label [] [ t "通話" ]
-        , paddingLeft "1rem" $ zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
+        -- , paddingLeft "1rem" $ zoom i (_2 . #mcTuuwa) $ radioGroupBEnum tuuwaRender
+        , paddingLeft "1rem" $ t "通話なし(チャットのみ)"
         -- まあ別に不要か取りあえず
         -- , label [] [ t "使用武器、意気込み等" ]
         -- , zoom i (_1 . #biiNote) $ inputOnChange [ placeholder "例) 中射程シューター使いです!" ]
@@ -133,11 +141,11 @@ inputCondition dis initial = do
         , t $ rankLabel rank
         ]
 
-    tuuwaRender tuuwa radio = do
-      div [] . one $ label []
-        [ radio []
-        , t $ tuuwaLabel tuuwa
-        ]
+    -- tuuwaRender tuuwa radio = do
+    --   div [] . one $ label []
+    --     [ radio []
+    --     , t $ tuuwaLabel tuuwa
+    --     ]
 
     maxNameLength = 12
     maxNoteLength = 32
@@ -156,7 +164,8 @@ inputCondition dis initial = do
         vCode = to T.strip >>> notBlank !> [ "フレンドコードは必須です" ] >>> regex codeRegex !> [ "フレンドコードの形式が違います" ]
         vNote = to T.strip >>> lessThan' "使用武器、意気込み等" maxNoteLength
         vBi   = BaseInfo <$> to biiDiscordUser <*> lmapL #biiDiscordUser vDis <*> lmapL #biiFriendCode vCode <*> lmapL #biiNote vNote
-        vMc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
+        -- vMc   = MatchingCondition <$> lmapL #mcRankTai id <*> lmapL #mcTuuwa id
+        vMc   = MatchingCondition <$> lmapL #mcRankTai id <*> pure TuuwaNashi
         v     = (,,) <$> to fst <*> lmap fst vBi <*> lmap snd vMc
       in applyM v
 
@@ -164,7 +173,7 @@ inputCondition dis initial = do
       div [ style [("padding-left", i)] ] . one
 
 rankLabel = \case
-  RankCtoB       -> "C- ～ B+"
+  RankBtoA       -> "B- ～ A-"
   RankAtoS       -> "A- ～ S"
   RankSpToX2100  -> "S+ ～ X2100"
   RankAboveX2100 -> "X2100以上"
@@ -209,7 +218,7 @@ matching rs ctx dis mc mem cb = do
             [ dt [] [ t "ランク帯" ], dd [] [ t $ rankLabel $ mcRankTai mc ]
             , dt [] [ t "通話" ], dd [] [ t $ tuuwaLabel $ mcTuuwa mc ]
             ]
-          , MFTimeout <$ countdown 100 \i ->
+          , MFTimeout <$ countdown (60 * 10) \i ->
               orr
               [ t "あと "
               , h2 [ style [("display", "inline-block")] ] [ t $ show i ]
@@ -257,7 +266,7 @@ matchRoom ctx self Match{..} = do
     , div [ style [("margin-bottom", "1rem")] ]
       [ t "メンバー"
       , ol [] $ map (\m -> li [] [ displayMember m ]) matchMembers
-      , small [] [ t "部屋立ては1番がお願いします。2, 3, 4 番は1番にフレンド申請お願いします。" ]
+      , small [] [ t "部屋立ては1番がお願いします。2番以降は1番にフレンド申請お願いします。" ]
       ]
     , () <$ button [ onClick ] [ t "条件入力画面に戻る" ]
     ]
@@ -268,7 +277,10 @@ matchRoom ctx self Match{..} = do
 
 main :: IO ()
 main = do
-  let header' = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/awsm.css/dist/awsm.min.css")])]
+  let header' =
+        [ VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/awsm.css/dist/awsm.min.css")])
+        , VLeaf "meta" (fromList [("name", AText "viewport"), ("content", AText "width=device-width, initial-scale=1.0")])
+        ]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/wingcss")])]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/light.min.css")])]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/picnic")])]

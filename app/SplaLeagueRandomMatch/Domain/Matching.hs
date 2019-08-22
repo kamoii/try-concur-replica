@@ -52,7 +52,7 @@ addAndTryMatch v@(id, cond) MatchingQueue{mqQueue} = do
   when (elem id (allIds mqQueue)) $ Left AlreadyInTheQueue
   let rankTai  = mcRankTai cond
   let que      = (mqQueue ! rankTai) <> [v]
-  pure $ case simpleMatching que of
+  pure $ case simpleMatching2 que of
     Nothing ->
       (Nothing, MatchingQueue (mqQueue // [(rankTai,que)]))
     Just ((ids,tuuwa), leftovers) ->
@@ -61,6 +61,20 @@ addAndTryMatch v@(id, cond) MatchingQueue{mqQueue} = do
 cancel :: Ord id => id -> MatchingQueue id -> MatchingQueue id
 cancel id MatchingQueue{mqQueue} =
   MatchingQueue $ mqQueue <&> filter ((/=id) . fst)
+
+{-
+
+ペア かつ 通話なし前提のシンプルマッチング
+
+-}
+simpleMatching2
+  :: forall  id. Eq id
+  => [(id, MatchingCondition)]
+  -> Maybe (([id], Tuuwa), [(id, MatchingCondition)])
+simpleMatching2 []       = Nothing
+simpleMatching2 (_:[])   = Nothing
+simpleMatching2 (a:b:xs) = Just (([fst a, fst b], TuuwaNashi), xs)
+
 
 {- | マッチングアルゴリズム
 

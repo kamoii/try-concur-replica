@@ -21,9 +21,14 @@ data BaseInfo = BaseInfo
   , ikaNote :: Text
   } deriving (Generic, Show)
 
+
+-- 雰囲気(ガチ or エンジョイ)
+-- チーム形態(4人 or 2人(pair))
+
+-- リーグは B-以上から
 data RankTai
-  = RankCtoB         -- C- ~ B+
-  | RankAtoS         -- A- ~ S
+  = RankBtoA         -- B- ~ A-
+  | RankAtoS         -- A ~ S
   | RankSpToX2100    -- S+ ~ X2100
   | RankAboveX2100   -- X2100 ~
   deriving (Ix, Eq, Ord, Show, Bounded, Enum)
