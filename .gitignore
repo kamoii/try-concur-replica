@@ -2,5 +2,5 @@
 try-concur-replica.cabal
 *~
 
-/discord.token
+/result
 /.stack-to-nix.cache
