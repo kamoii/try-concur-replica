@@ -29,6 +29,7 @@ import Data.Time.Clock.POSIX (getPOSIXTime)
 import Data.UUID (UUID)
 import qualified Data.UUID as UUID
 import qualified Data.UUID.V1 as UUID
+import System.Environment (getEnv)
 
 import Discord
 import Discord.Types
@@ -38,10 +39,11 @@ import qualified Discord.Requests as R
 -- orhpn...
 instance Exception RestCallErrorCode
 
+-- DISCORD_TOKEN環境変数から
 readDiscordToken :: IO DiscordToken
 readDiscordToken = do
-  tok <- readFileText "discord.token"
-  pure $ DiscordToken $ T.strip tok
+  tok <- getEnv "DISCORD_TOKEN"
+  pure $ DiscordToken $ T.strip $ toText tok
 
 newtype DiscordToken = DiscordToken Text
   deriving Eq
