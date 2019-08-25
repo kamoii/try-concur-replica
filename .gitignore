@@ -3,3 +3,4 @@ try-concur-replica.cabal
 *~
 
 /discord.token
+/.stack-to-nix.cache
