@@ -146,6 +146,8 @@ executables:
     - uuid
     - discord-haskell
     - neat-interpolation
+    - chronos
+    - torsor
 
 tests:
   try-concur-replica-test:

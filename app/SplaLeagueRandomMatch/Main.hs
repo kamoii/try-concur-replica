@@ -6,6 +6,8 @@
 module Main where
 
 import P hiding (span, id, whenJust)
+import qualified Torsor                          as Tr
+import qualified Chronos                         as Ch
 import Control.Category (id)
 import qualified Relude.Extra.Enum as BEnum
 import qualified Data.Text              as T
@@ -290,7 +292,10 @@ main = do
   ctx <- mkCtx
   dis <- Dis.initialize
   let cnf' = mkDefaultConfig' 8080 "#リグマ部屋" E.acquire E.release
-  let cnf = cnf' { cfgHeader = header' }
+  let cnf = cnf'
+        { cfgHeader = header'
+        , cfgWSReconnectionSpanLimit = 20 `Tr.scale` Ch.minute
+        }
   run cnf \rs -> do
      orr
        [ header_
@@ -335,10 +340,8 @@ main = do
       [ strong [] [ t "#リグマ部屋(β)" ] ]
 
     footer_ = footer
-      [ style [("margin-top", "2rem"), ("padding", "0.5rem"), ("border-top", "2px solid #d3d3d3"), ("background-color", "#f5f5f5")] ]
-      [ small [] [ t "v0.0.1" ]
-      , br []
-      , link_ "https://twitter.com/kamoii" "kamoii@twitter"
+      [ style [("margin-top", "3rem"), ("padding", "0.5rem"), ("border-top", "2px solid #d3d3d3"), ("background-color", "#f5f5f5")] ]
+      [ link_ "https://twitter.com/kamoii" "kamoii@twitter"
       , br []
       , link_ "https://discord.gg/6HPr8dv" "リグマ部屋@discord"
       ]
