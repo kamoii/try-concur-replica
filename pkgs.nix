@@ -10,9 +10,9 @@
         try-concur-replica = ./try-concur-replica.nix;
         concur-replica = ./concur-replica.nix;
         replica = ./replica.nix;
+        concur-core = ./concur-core.nix;
         discord-haskell = ./discord-haskell.nix;
         websockets = ./websockets.nix;
-        concur-core = ./concur-core.nix;
         }) // {};
       };
   resolver = "lts-13.29";

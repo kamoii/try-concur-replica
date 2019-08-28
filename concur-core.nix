@@ -64,11 +64,6 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           ];
         };
       };
-    } // {
-    src = (pkgs.lib).mkDefault (pkgs.fetchgit {
-      url = "https://github.com/pkamenarsky/concur.git";
-      rev = "6c6bcc07b2688182945b28f154a013eee3f624c5";
-      sha256 = "1sdpm2f7b6b9rypl6sb27346d187v32h5lr2jnjhix1rhlrknnnx";
-      });
-    postUnpack = "sourceRoot+=/concur-core; echo source root reset to \$sourceRoot";
+    } // rec {
+    src = (pkgs.lib).mkDefault /home/sino/mygithub/concur/concur-core;
     }) // { cabal-generator = "hpack"; }
