@@ -282,6 +282,7 @@ main = do
   let header' =
         [ VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/awsm.css/dist/awsm.min.css")])
         , VLeaf "meta" (fromList [("name", AText "viewport"), ("content", AText "width=device-width, initial-scale=1.0")])
+        , VLeaf "meta" (fromList [("name", AText "Description"), ("content", AText "スプラトゥーン2 リーグマッチ リグマ メンバー募集")])
         ]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://unpkg.com/wingcss")])]
   -- let header = [VLeaf "link" (fromList [("rel", AText "stylesheet"), ("href", AText "https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/light.min.css")])]
