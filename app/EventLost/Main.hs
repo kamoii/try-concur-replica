@@ -1,15 +1,8 @@
 module Main where
 
 import P
-
---
-import qualified Data.Text              as T
-import           Text.Read              (readMaybe)
-import           Control.Concurrent.STM (retry, check)
 import           Control.Concurrent (threadDelay)
-import           Control.Exception
---
-import           Concur.Core
+import           Concur.Core (Widget, orr)
 import           Concur.Replica
 
 {-|
@@ -31,7 +24,7 @@ manualCounter i = do
 
 autoCounter :: Int -> Widget HTML void
 autoCounter i = do
-  liftIO (threadDelay $ 1 * 1 * 1000) <|> div [] [ text $ show i ]
+  liftIO (threadDelay $ 1 * 1000 * 1000) <|> div [] [ text $ show i ]
   autoCounter $ i+1
 
 main :: IO ()

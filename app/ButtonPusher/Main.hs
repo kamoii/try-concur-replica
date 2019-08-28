@@ -1,16 +1,9 @@
 module Main where
 
 import P
---
-import qualified Data.Text              as T
-import           System.Random          as R
-import           Text.Read              (readMaybe)
-import           Control.Concurrent.STM (retry, check)
---
-import           Concur.Core
+import           Control.Concurrent.STM (check)
+import           Concur.Core (Widget, orr)
 import           Concur.Replica
-import qualified Concur.Replica.Control.Exception as E
-import           Network.WebSockets.Connection   (ConnectionOptions, defaultConnectionOptions)
 
 -- | Dumbest online game in the world.
 --

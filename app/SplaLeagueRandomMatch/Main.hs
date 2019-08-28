@@ -297,22 +297,22 @@ main = do
         , cfgWSReconnectionSpanLimit = 20 `Tr.scale` Ch.minute
         }
   run cnf \rs -> do
+     id <- liftIO $ genId
      orr
        [ header_
        , main_ []
          [ do
              -- Discord回りでスレッドが止まってしまった時点でエラー画面を表示する
              -- TODO: 再起動するべきかな？
-             _ <- liftIO (atomically $ Dis.waitDeadSTM dis) <|> routeStart rs ctx dis
+             _ <- liftIO (atomically $ Dis.waitDeadSTM dis) <|> routeStart id rs ctx dis
              t "サーバエラーが発生しました"
          ]
        , footer_
        ]
   where
     -- Main route
-    routeStart :: _ => _ -> _ -> _ -> m a
-    routeStart rs ctx dis = do
-      id <- liftIO $ genId
+    routeStart :: _ => _ -> _ -> _ -> _ -> m a
+    routeStart id rs ctx dis = do
       welcome
       untilRight (initialBaseInfo,initialMc) \i' -> do
           (bii, bi, cond) <- inputCondition dis i'
